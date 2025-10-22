@@ -1,0 +1,41 @@
+[package]
+name = "gridsynth"
+version = "0.1.0"
+edition = "2021"
+authors = ["Shun Yamamoto", "Nobuyuki Yoshioka", "IBM"]
+license = "MIT"
+description = "Rust-based synthesizer that decomposes single-qubit Z-axis rotations into Clifford+T gate sequences"
+repository = "https://github.com/qiskit-community/gridsynth"
+homepage = "https://github.com/qiskit-community/gridsynth"
+readme = "README.md"
+keywords = ["quantum", "benchmarking"]
+categories = ["algorithms", "science"]
+rust-version = "1.70"
+
+[[bin]]
+name = "gridsynth"
+path = "src/main.rs"
+
+[lib]
+name = "gridsynth"
+path = "src/lib.rs"
+
+[dependencies]
+nalgebra = { version = "0.34", features = ["macros"] }
+once_cell = "1.21"
+num-traits = "0.2"
+rand = "0.9"
+clap = { version = "4.5", features = ["derive"] }
+num = "0.4"
+dashu-int = "0.4.1"
+dashu-float = "0.4.3"
+dashu-base = "0.4.1"
+log = "0.4"
+env_logger = "0.11"
+
+[dev-dependencies]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
