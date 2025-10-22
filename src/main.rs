@@ -106,7 +106,7 @@ fn main() {
 }
 
 fn build_command() -> Command {
-    Command::new("gridsynth")
+    Command::new("rsgridsynth")
         .arg(Arg::new("theta").required(true))
         .arg(Arg::new("epsilon").required(true))
         .arg(Arg::new("dps").long("dps").default_value(None))

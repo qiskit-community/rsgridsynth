@@ -1,6 +1,6 @@
-# gridsynth
+# rsgridsynth
 
-`gridsynth` is a high-precision Rust-based synthesizer that decomposes single-qubit Z-axis rotations into Clifford+T gate sequences, using number-theoretic algorithms and geometry-of-numbers methods.
+`rsgridsynth` is a high-precision Rust-based synthesizer that decomposes single-qubit Z-axis rotations into Clifford+T gate sequences, using number-theoretic algorithms and geometry-of-numbers methods.
 
 
 ## Build
@@ -14,13 +14,13 @@ cargo build --release
 The binary will be at:
 
 ```
-target/release/gridsynth
+target/release/rsgridsynth
 ```
 
 ## Usage
 
 ```bash
-./target/release/gridsynth <theta> <epsilon> [OPTIONS]
+./target/release/rsgridsynth <theta> <epsilon> [OPTIONS]
 ```
 
 * `<theta>`: The rotation angle in radians (e.g. `0.6`)
@@ -41,7 +41,7 @@ target/release/gridsynth
 ## Example
 
 ```bash
-./target/release/gridsynth 0.6 1e-8 -v -t
+./target/release/rsgridsynth 0.6 1e-8 -v -t
 ```
 
 Sample output:
