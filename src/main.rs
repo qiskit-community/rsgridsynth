@@ -2,11 +2,11 @@
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
 use clap::{Arg, Command};
-use dashu_float::{round::mode::HalfEven, FBig};
-use dashu_int::{IBig, UBig};
+use dashu_int::UBig;
 use log::info;
 
 pub mod common;
+pub mod config;
 pub mod diophantine;
 pub mod grid_op;
 pub mod gridsynth;
@@ -19,54 +19,12 @@ pub mod synthesis_of_clifford_t;
 pub mod tdgp;
 pub mod to_upright;
 pub mod unitary;
-use std::{f32::consts::LOG2_10, str::FromStr, time::Instant};
-
-use gridsynth::gridsynth_gates;
+use std::{f32::consts::LOG2_10, time::Instant};
 
 use crate::common::{ib_to_bf_prec, set_prec_bits};
-
-pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
-    let input = input.trim();
-    let (sign, body) = if let Some(s) = input.strip_prefix('-') {
-        (-1, s)
-    } else if let Some(s) = input.strip_prefix('+') {
-        (1, s)
-    } else {
-        (1, input)
-    };
-
-    let (base_str, exp_str) = match body.split_once(['e', 'E']) {
-        Some((b, e)) => (b, e),
-        None => (body, "0"),
-    };
-
-    let parts: Vec<&str> = base_str.split('.').collect();
-    if parts.len() > 2 {
-        return None;
-    }
-    let int_part = parts[0];
-    let frac_part = if parts.len() == 2 { parts[1] } else { "" };
-    let digits = format!("{}{}", int_part, frac_part);
-    let decimal_digits = frac_part.len() as i32;
-
-    let exponent: i32 = exp_str.parse().ok()?;
-    let scale = exponent - decimal_digits;
-
-    let mut numerator = IBig::from_str(&digits).ok()? * sign;
-    let mut denominator = IBig::from(1);
-
-    match scale.cmp(&0) {
-        std::cmp::Ordering::Greater => {
-            numerator *= IBig::from(10u8).pow(scale as usize);
-        }
-        std::cmp::Ordering::Less => {
-            denominator = IBig::from(10u8).pow((-scale) as usize);
-        }
-        std::cmp::Ordering::Equal => {}
-    }
-
-    Some((numerator, denominator))
-}
+use crate::config::parse_decimal_with_exponent;
+use crate::config::GridSynthConfig;
+use gridsynth::gridsynth_gates;
 
 fn main() {
     let matches = build_command().get_matches();
@@ -82,20 +40,13 @@ fn main() {
 
     let args = parse_arguments(&matches);
 
-    let start = if args.time {
+    let start = if args.measure_time {
         Some(Instant::now())
     } else {
         None
     };
 
-    let gates = gridsynth_gates(
-        args.theta,
-        args.epsilon,
-        args.dtimeout,
-        args.factoring_timeout,
-        args.verbose,
-        args.time,
-    );
+    let gates = gridsynth_gates(&args);
 
     if let Some(start_time) = start {
         let elapsed = start_time.elapsed();
@@ -142,16 +93,7 @@ fn build_command() -> Command {
         )
 }
 
-struct Args {
-    theta: FBig<HalfEven>,
-    epsilon: FBig<HalfEven>,
-    dtimeout: u128,
-    factoring_timeout: u128,
-    verbose: bool,
-    time: bool,
-}
-
-fn parse_arguments(matches: &clap::ArgMatches) -> Args {
+fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
     let theta_str = matches.get_one::<String>("theta").unwrap();
     let (theta_num, theta_den) = parse_decimal_with_exponent(theta_str).unwrap();
     let theta = ib_to_bf_prec(theta_num) / ib_to_bf_prec(theta_den);
@@ -183,12 +125,12 @@ fn parse_arguments(matches: &clap::ArgMatches) -> Args {
     let verbose = matches.get_flag("verbose");
     let time = matches.get_flag("time");
 
-    Args {
+    GridSynthConfig {
         theta,
         epsilon,
-        dtimeout,
+        diophantine_timeout: dtimeout,
         factoring_timeout,
         verbose,
-        time,
+        measure_time: time,
     }
 }

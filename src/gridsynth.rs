@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
 use crate::common::{cos_fbig, fb_with_prec, get_prec_bits, ib_to_bf_prec, sin_fbig};
+use crate::config::GridSynthConfig;
 use crate::diophantine::diophantine_dyadic;
 use crate::math::solve_quadratic;
 use crate::region::Ellipse;
@@ -379,30 +380,23 @@ fn gridsynth(
     )
 }
 
-pub fn gridsynth_gates(
-    theta: FBig<HalfEven>,
-    epsilon: FBig<HalfEven>,
-    diophantine_timeout: u128,
-    factoring_timeout: u128,
-    verbose: bool,
-    measure_time: bool,
-) -> String {
-    let start_total = if measure_time {
+pub fn gridsynth_gates(config: &GridSynthConfig) -> String {
+    let start_total = if config.measure_time {
         Some(Instant::now())
     } else {
         None
     };
 
     let u_approx = gridsynth(
-        theta,
-        epsilon,
-        diophantine_timeout,
-        factoring_timeout,
-        verbose,
-        measure_time,
+        config.theta.clone(),
+        config.epsilon.clone(),
+        config.diophantine_timeout,
+        config.factoring_timeout,
+        config.verbose,
+        config.measure_time,
     );
 
-    let start_decompose = if measure_time {
+    let start_decompose = if config.measure_time {
         Some(Instant::now())
     } else {
         None
@@ -410,7 +404,7 @@ pub fn gridsynth_gates(
     let gates = decompose_domega_unitary(u_approx);
 
     if let Some(start) = start_decompose {
-        if measure_time {
+        if config.measure_time {
             debug!(
                 "time of decompose_domega_unitary: {:.3} ms",
                 start.elapsed().as_secs_f64() * 1000.0
@@ -418,7 +412,7 @@ pub fn gridsynth_gates(
         }
     }
     if let Some(start) = start_total {
-        if measure_time {
+        if config.measure_time {
             debug!(
                 "total time: {:.3} ms",
                 start.elapsed().as_secs_f64() * 1000.0
