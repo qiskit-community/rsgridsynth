@@ -63,6 +63,7 @@ pub fn config_from_theta_epsilon(theta: f64, epsilon: f64) -> GridSynthConfig {
     let (theta_num, theta_den) = parse_decimal_with_exponent(&theta.to_string()).unwrap();
     let theta = ib_to_bf_prec(theta_num) / ib_to_bf_prec(theta_den);
     let (epsilon_num, epsilon_den) = parse_decimal_with_exponent(&epsilon.to_string()).unwrap();
+    // The magic number 12 safely overapproximates the bits of precision.
     let calculated_prec_bits =
         12 * (epsilon_den.ilog(&UBig::from(10u8)) - epsilon_num.ilog(&UBig::from(10u8)));
     let prec_bits: usize = calculated_prec_bits;
