@@ -103,6 +103,7 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
     let dps: Option<u32> = matches
         .get_one::<String>("dps")
         .and_then(|s| s.parse().ok());
+    // The magic number 12 safely overapproximates the bits of precision.
     let calculated_prec_bits =
         12 * (epsilon_den.ilog(&UBig::from(10u8)) - epsilon_num.ilog(&UBig::from(10u8)));
     let prec_bits: usize = if let Some(dps_val) = dps {
