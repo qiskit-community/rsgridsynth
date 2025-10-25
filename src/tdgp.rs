@@ -112,12 +112,10 @@ pub fn solve_tdgp(
     }
 
     let op_g_inv = op_g.inv().unwrap();
-    let _sol_sufficient_len = sol_sufficient.len();
-    let sol: Vec<DOmega> = sol_sufficient
-        .into_iter()
-        .map(|z| op_g_inv.clone() * z)
-        .filter(|z| set_a.inside(z) && set_b.inside(z.conj_sq2()))
-        .collect();
 
-    sol
+    sol_sufficient
+       .into_iter()
+       .map(|z| op_g_inv.clone() * z)
+       .filter(|z| set_a.inside(z) && set_b.inside(z.conj_sq2()))
+       .collect()
 }
