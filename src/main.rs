@@ -1,6 +1,7 @@
 // Copyright (c) 2025 IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use clap::{Arg, Command};
 use dashu_int::UBig;
 use log::info;
@@ -23,7 +24,7 @@ use std::{f32::consts::LOG2_10, time::Instant};
 
 use crate::common::{ib_to_bf_prec, set_prec_bits};
 use crate::config::parse_decimal_with_exponent;
-use crate::config::GridSynthConfig;
+use crate::config::{GridSynthConfig, DiophantineData};
 use gridsynth::gridsynth_gates;
 
 fn main() {
@@ -38,7 +39,7 @@ fn main() {
         env_logger::init();
     }
 
-    let args = parse_arguments(&matches);
+    let mut args = parse_arguments(&matches);
 
     let start = if args.measure_time {
         Some(Instant::now())
@@ -46,7 +47,7 @@ fn main() {
         None
     };
 
-    let gates = gridsynth_gates(&args);
+    let gates = gridsynth_gates(&mut args);
 
     if let Some(start_time) = start {
         let elapsed = start_time.elapsed();
@@ -61,6 +62,7 @@ fn build_command() -> Command {
         .arg(Arg::new("theta").required(true))
         .arg(Arg::new("epsilon").required(true))
         .arg(Arg::new("dps").long("dps").default_value(None))
+        .arg(Arg::new("seed").long("seed").short('s').default_value("1"))
         .arg(
             Arg::new("dtimeout")
                 .long("dtimeout")
@@ -113,7 +115,7 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
     };
     set_prec_bits(prec_bits);
     let epsilon = ib_to_bf_prec(epsilon_num) / ib_to_bf_prec(epsilon_den);
-    let dtimeout = matches
+    let diophantine_timeout = matches
         .get_one::<String>("dtimeout")
         .unwrap()
         .parse()
@@ -124,14 +126,21 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         .parse()
         .unwrap();
     let verbose = matches.get_flag("verbose");
-    let time = matches.get_flag("time");
+    let measure_time = matches.get_flag("time");
+
+    let seed = matches
+        .get_one::<String>("seed")
+        .unwrap()
+        .parse()
+        .unwrap();
+    let rng: StdRng = SeedableRng::seed_from_u64(seed);
+    let diophantine_data = DiophantineData {diophantine_timeout, factoring_timeout, rng: rng};
 
     GridSynthConfig {
         theta,
         epsilon,
-        diophantine_timeout: dtimeout,
-        factoring_timeout,
         verbose,
-        measure_time: time,
+        measure_time,
+        diophantine_data,
     }
 }
