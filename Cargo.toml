@@ -10,7 +10,7 @@ homepage = "https://github.com/qiskit-community/rsgridsynth"
 readme = "README.md"
 keywords = ["quantum", "benchmarking"]
 categories = ["algorithms", "science"]
-rust-version = "1.70"
+rust-version = "1.80"
 
 [[bin]]
 name = "rsgridsynth"

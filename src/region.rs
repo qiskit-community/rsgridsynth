@@ -12,7 +12,6 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 use crate::common::{fb_with_prec, get_prec_bits};
 use std::fmt::{Debug, Display, Formatter};
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Interval {
     pub l: FBig<HalfEven>,

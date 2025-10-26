@@ -26,7 +26,7 @@ fn random_ubig<R>(bits: usize, rng: &mut R) -> UBig
 where
     R: Rng + ?Sized,
 {
-    let mut bytes = vec![0u8; (bits + 7) / 8];
+    let mut bytes = vec![0u8; bits.div_ceil(8)];
     rng.fill_bytes(&mut bytes);
     let mut n = UBig::from_le_bytes(&bytes);
     n |= UBig::ONE << (bits - 1);
