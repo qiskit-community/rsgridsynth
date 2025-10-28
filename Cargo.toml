@@ -21,7 +21,7 @@ name = "rsgridsynth"
 path = "src/lib.rs"
 
 [dependencies]
-nalgebra = { version = "0.34", features = ["macros"] }
+nalgebra = { version = "0.33", features = ["macros"] }
 once_cell = "1.21"
 num-traits = "0.2"
 rand = "0.9"

@@ -1,13 +1,14 @@
 // Copyright (c) 2024-2025 Shun Yamamoto and Nobuyuki Yoshioka, and IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
+use rand::Rng;
 use crate::ring::{DOmega, DRootTwo, ZOmega, ZRootTwo};
+use crate::config::DiophantineData;
 use dashu_base::{BitTest, Gcd, RemEuclid};
 use dashu_int::ops::Abs;
 use dashu_int::{IBig, UBig};
 use log::warn;
 use once_cell::sync::Lazy;
-use rand::Rng;
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 use std::{
@@ -20,6 +21,7 @@ static PRIMALITY_CACHE: LazyLock<Mutex<HashMap<IBig, bool>>> =
 
 type SqrtCacheType = LazyLock<Mutex<HashMap<(IBig, IBig), Option<IBig>>>>;
 static SQRT_CACHE: SqrtCacheType = LazyLock::new(|| Mutex::new(HashMap::new()));
+
 
 // WARN: Distribution of random_ubig is different from the rng.random_range
 fn random_ubig<R>(bits: usize, rng: &mut R) -> UBig
@@ -102,7 +104,7 @@ fn modpow(mut base: IBig, exp: &IBig, modulus: &IBig) -> IBig {
     result
 }
 
-pub fn is_prime(mut n: IBig, iterations: usize) -> bool {
+pub fn is_prime<R: Rng + ?Sized>(mut n: IBig, iterations: usize, rng: &mut R) -> bool {
     if n < IBig::ZERO {
         n = -n;
     }
@@ -146,12 +148,11 @@ pub fn is_prime(mut n: IBig, iterations: usize) -> bool {
         r += 1;
     }
 
-    let mut rng = rand::rng();
     let bits = n.bit_len();
     let n_minus1 = &n - 1;
 
     'outer: for _ in 0..reduced_iterations {
-        let a = IBig::from(random_ubig(bits, &mut rng));
+        let a = IBig::from(random_ubig(bits, rng));
         let mut x = modpow(a, &d, &n);
         if x == *ONE || x == n_minus1 {
             continue;
@@ -174,7 +175,7 @@ pub fn is_prime(mut n: IBig, iterations: usize) -> bool {
     true
 }
 
-pub fn sqrt_negative_one(p: &IBig, trials: usize) -> Option<IBig> {
+pub fn sqrt_negative_one<R: Rng + ?Sized>(p: &IBig, trials: usize, rng: &mut R) -> Option<IBig> {
     let cache_key = (p.clone(), IBig::NEG_ONE);
     if let Ok(cache) = SQRT_CACHE.lock() {
         if let Some(result) = cache.get(&cache_key) {
@@ -182,12 +183,11 @@ pub fn sqrt_negative_one(p: &IBig, trials: usize) -> Option<IBig> {
         }
     }
 
-    let mut rng = rand::rng();
     let bits = p.bit_len();
     let reduced_trials = std::cmp::min(trials, 8); // Reduce trials for performance
 
     for _ in 0..reduced_trials {
-        let b = IBig::from(random_ubig(bits, &mut rng));
+        let b = IBig::from(random_ubig(bits, rng));
         let exp = (p - IBig::ONE) >> 2;
         let h = modpow(b, &exp, p);
         let r = (&h * &h) % p;
@@ -210,7 +210,7 @@ pub fn sqrt_negative_one(p: &IBig, trials: usize) -> Option<IBig> {
     None
 }
 
-fn root_mod(x: IBig, p: &IBig, trials: usize) -> Option<IBig> {
+fn root_mod<R: Rng + ?Sized>(x: IBig, p: &IBig, trials: usize, rng: &mut R) -> Option<IBig> {
     let x: IBig = x.rem_euclid(p).into();
 
     let cache_key = (x.clone(), p.clone());
@@ -236,12 +236,11 @@ fn root_mod(x: IBig, p: &IBig, trials: usize) -> Option<IBig> {
         return None;
     }
 
-    let mut rng = rand::rng();
     let bits = p.bit_len();
     let reduced_trials = std::cmp::min(trials, 8); // Reduce trials for performance
 
     for _ in 0..reduced_trials {
-        let b = IBig::from(random_ubig(bits, &mut rng));
+        let b = IBig::from(random_ubig(bits, rng));
         let r = modpow(b.clone(), &(p - IBig::ONE), p);
         if r != IBig::ONE {
             if let Ok(mut cache) = SQRT_CACHE.lock() {
@@ -354,7 +353,7 @@ fn decompose_relatively_prime(mut factors: Vec<(IBig, i32)>) -> (IBig, Vec<(IBig
 static FACTOR_CACHE: LazyLock<Mutex<HashMap<IBig, Option<IBig>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-fn find_factor(n: &IBig, timeout_ms: u128, _m: usize) -> Option<IBig> {
+fn find_factor<R: Rng + ?Sized>(n: &IBig, timeout_ms: u128, _m: usize, rng: &mut R) -> Option<IBig> {
     if n.bit_len() > 1024 || n == &IBig::ZERO || n == &IBig::ONE {
         return None;
     }
@@ -414,7 +413,7 @@ fn find_factor(n: &IBig, timeout_ms: u128, _m: usize) -> Option<IBig> {
     }
 
     let remaining_timeout = timeout_ms.saturating_sub(start.elapsed().as_millis());
-    let result = pollard_rho(n, remaining_timeout);
+    let result = pollard_rho(n, remaining_timeout, rng);
 
     if let Ok(mut cache) = FACTOR_CACHE.try_lock() {
         cache.insert(n.clone(), result.clone());
@@ -426,9 +425,8 @@ fn find_factor(n: &IBig, timeout_ms: u128, _m: usize) -> Option<IBig> {
     result
 }
 
-fn pollard_rho(n: &IBig, timeout_ms: u128) -> Option<IBig> {
+fn pollard_rho<R: Rng + ?Sized>(n: &IBig, timeout_ms: u128, rng: &mut R) -> Option<IBig> {
     let start = Instant::now();
-    let mut rng = rand::rng();
     for _ in 0..5 {
         if start.elapsed().as_millis() >= timeout_ms {
             return None;
@@ -462,7 +460,8 @@ fn pollard_rho(n: &IBig, timeout_ms: u128) -> Option<IBig> {
     None
 }
 
-fn adj_decompose_int_prime(p: &IBig) -> Result<Option<ZOmega>, String> {
+          fn adj_decompose_int_prime<R>(p: &IBig, rng: &mut R) -> Result<Option<ZOmega>, String>
+          where R: Rng + ?Sized, {
     let p = p.abs();
     if p == IBig::ZERO || p == IBig::ONE {
         return Ok(Some(ZOmega::from_int(p)));
@@ -475,9 +474,9 @@ fn adj_decompose_int_prime(p: &IBig) -> Result<Option<ZOmega>, String> {
             IBig::ZERO,
         )));
     }
-    if is_prime(p.clone(), 4) {
+    if is_prime(p.clone(), 4, rng) {
         if &p & 0b11 == IBig::ONE {
-            if let Some(h) = sqrt_negative_one(&p, 100) {
+            if let Some(h) = sqrt_negative_one(&p, 100, rng) {
                 let t = ZOmega::gcd(
                     h + ZOmega::new(IBig::ZERO, IBig::ONE, IBig::ZERO, IBig::ZERO),
                     ZOmega::from_int(p.clone()),
@@ -489,7 +488,7 @@ fn adj_decompose_int_prime(p: &IBig) -> Result<Option<ZOmega>, String> {
             }
             Ok(None)
         } else if &p & 0b111 == IBig::from(3) {
-            if let Some(h) = root_mod(IBig::from(-2), &p, 100) {
+            if let Some(h) = root_mod(IBig::from(-2), &p, 100, rng) {
                 let t = ZOmega::gcd(
                     h + ZOmega::new(IBig::ONE, IBig::ZERO, IBig::ONE, IBig::ZERO),
                     ZOmega::from_int(p.clone()),
@@ -501,7 +500,7 @@ fn adj_decompose_int_prime(p: &IBig) -> Result<Option<ZOmega>, String> {
             }
             Ok(None)
         } else if &p & 0b111 == IBig::from(7) {
-            if root_mod(IBig::from(2), &p, 100).is_some() {
+            if root_mod(IBig::from(2), &p, 100, rng).is_some() {
                 Err("No solution in adj_decompose_int_prime".to_string())
             } else {
                 Ok(None)
@@ -510,7 +509,7 @@ fn adj_decompose_int_prime(p: &IBig) -> Result<Option<ZOmega>, String> {
             Ok(None)
         }
     } else if &p & 0b111 == IBig::from(7) {
-        if root_mod(IBig::from(2), &p, 100).is_some() {
+        if root_mod(IBig::from(2), &p, 100, rng).is_some() {
             Err("No solution in adj_decompose_int_prime".to_string())
         } else {
             Ok(None)
@@ -520,11 +519,13 @@ fn adj_decompose_int_prime(p: &IBig) -> Result<Option<ZOmega>, String> {
     }
 }
 
-fn adj_decompose_int_prime_power(p: &IBig, k: i32) -> Result<Option<ZOmega>, String> {
+fn adj_decompose_int_prime_power<R>(p: &IBig, k: i32, rng: &mut R) -> Result<Option<ZOmega>, String>
+          where R : Rng + ?Sized,
+          {
     if k & 1 == 0 {
         Ok(Some(ZOmega::from_int(p.pow((k / 2) as usize))))
     } else {
-        match adj_decompose_int_prime(p) {
+        match adj_decompose_int_prime(p, rng) {
             Ok(Some(t)) => Ok(Some(t.pow(k.try_into().unwrap()))),
             Ok(None) => Ok(None),
             Err(e) => Err(e),
@@ -534,16 +535,15 @@ fn adj_decompose_int_prime_power(p: &IBig, k: i32) -> Result<Option<ZOmega>, Str
 
 fn adj_decompose_int(
     mut n: IBig,
-    diophantine_timeout: u128,
-    factoring_timeout: u128,
     start_time: Instant,
+    diophantine_data: &mut DiophantineData,
 ) -> Result<Option<ZOmega>, String> {
     n = n.abs();
     let mut facs = vec![(n, 1)];
     let mut t = ZOmega::from_int(IBig::ONE);
 
     while let Some((p, k)) = facs.pop() {
-        if start_time.elapsed().as_millis() >= diophantine_timeout {
+        if start_time.elapsed().as_millis() >= diophantine_data.diophantine_timeout {
             return Ok(None);
         }
 
@@ -551,10 +551,10 @@ fn adj_decompose_int(
             return Ok(None);
         }
 
-        match adj_decompose_int_prime_power(&p, k) {
+        match adj_decompose_int_prime_power(&p, k, &mut diophantine_data.rng) {
             Ok(None) => {
-                let individual_timeout = std::cmp::min(factoring_timeout, 20);
-                if let Some(fac) = find_factor(&p, individual_timeout, 128) {
+                let individual_timeout = std::cmp::min(diophantine_data.factoring_timeout, 20);
+                if let Some(fac) = find_factor(&p, individual_timeout, 128, &mut diophantine_data.rng) {
                     facs.push((p / fac.clone(), k));
                     facs.push((fac, k));
                     let (_, new_facs) = decompose_relatively_prime(facs);
@@ -576,16 +576,15 @@ fn adj_decompose_int(
 
 fn adj_decompose_selfassociate(
     xi: ZRootTwo,
-    diophantine_timeout: u128,
-    factoring_timeout: u128,
     start_time: Instant,
+    diophantine_data: &mut DiophantineData,
 ) -> Result<Option<ZOmega>, String> {
     if xi == ZRootTwo::from_int(IBig::ZERO) {
         return Ok(Some(ZOmega::from_int(IBig::ZERO)));
     }
     let n: IBig = (&xi.a).gcd(&xi.b).into();
     let r = xi / n.clone();
-    let t1 = adj_decompose_int(n, diophantine_timeout, factoring_timeout, start_time);
+    let t1 = adj_decompose_int(n, start_time, diophantine_data);
     let t2 = if r % ZRootTwo::new(IBig::ZERO, IBig::ONE) == ZRootTwo::from_int(IBig::ZERO) {
         ZOmega::new(IBig::ZERO, IBig::ZERO, IBig::ONE, IBig::ONE)
     } else {
@@ -642,7 +641,7 @@ pub fn decompose_relatively_zomega_prime(
     (u, facs)
 }
 
-pub fn adj_decompose_zomega_prime(eta: ZRootTwo) -> Result<Option<ZOmega>, String> {
+pub fn adj_decompose_zomega_prime<R: Rng + ?Sized>(eta: ZRootTwo, rng: &mut R) -> Result<Option<ZOmega>, String> {
     let mut p = eta.norm();
     if p < IBig::ZERO {
         p = -p;
@@ -658,10 +657,10 @@ pub fn adj_decompose_zomega_prime(eta: ZRootTwo) -> Result<Option<ZOmega>, Strin
         )));
     }
 
-    if is_prime(p.clone(), 4) {
+    if is_prime(p.clone(), 4, rng) {
         let check: i32 = (&p & IBig::from(0b111)).try_into().unwrap();
         match check {
-            1 => Ok(sqrt_negative_one(&p, 100).and_then(|h| {
+            1 => Ok(sqrt_negative_one(&p, 100, rng).and_then(|h| {
                 let t = ZOmega::gcd(
                     h + ZOmega::new(IBig::ZERO, IBig::ONE, IBig::ZERO, IBig::ZERO),
                     ZOmega::from_zroottwo(&eta),
@@ -676,7 +675,7 @@ pub fn adj_decompose_zomega_prime(eta: ZRootTwo) -> Result<Option<ZOmega>, Strin
                     None
                 }
             })),
-            3 => Ok(root_mod(IBig::from(-2), &p, 100).and_then(|h| {
+            3 => Ok(root_mod(IBig::from(-2), &p, 100, rng).and_then(|h| {
                 let t = ZOmega::gcd(
                     h + ZOmega::new(IBig::ONE, IBig::ZERO, IBig::ONE, IBig::ZERO),
                     ZOmega::from_zroottwo(&eta),
@@ -692,7 +691,7 @@ pub fn adj_decompose_zomega_prime(eta: ZRootTwo) -> Result<Option<ZOmega>, Strin
                 }
             })),
             7 => {
-                if root_mod(IBig::from(2), &p, 100).is_some() {
+                if root_mod(IBig::from(2), &p, 100, rng).is_some() {
                     Err("No solution in adj_decompose_zomega_prime".to_string())
                 } else {
                     Ok(None)
@@ -701,7 +700,7 @@ pub fn adj_decompose_zomega_prime(eta: ZRootTwo) -> Result<Option<ZOmega>, Strin
             _ => Ok(None),
         }
     } else if &p & 0b111 == IBig::from(7) {
-        if root_mod(IBig::from(2), &p, 100).is_some() {
+        if root_mod(IBig::from(2), &p, 100, rng).is_some() {
             Err("No solution in adj_decompose_zomega_prime".to_string())
         } else {
             Ok(None)
@@ -711,11 +710,11 @@ pub fn adj_decompose_zomega_prime(eta: ZRootTwo) -> Result<Option<ZOmega>, Strin
     }
 }
 
-pub fn adj_decompose_zomega_prime_power(eta: ZRootTwo, k: i32) -> Result<Option<ZOmega>, String> {
+pub fn adj_decompose_zomega_prime_power<R: Rng + ?Sized>(eta: ZRootTwo, k: i32, rng: &mut R) -> Result<Option<ZOmega>, String> {
     if k & 1 == 0 {
         Ok(Some(ZOmega::from_zroottwo(&eta.pow(&IBig::from(k / 2)))))
     } else {
-        match adj_decompose_zomega_prime(eta) {
+        match adj_decompose_zomega_prime(eta, rng) {
             Ok(Some(t)) => Ok(Some(t.pow(k.try_into().unwrap()))),
             Ok(None) => Ok(None),
             Err(e) => Err(e),
@@ -725,25 +724,24 @@ pub fn adj_decompose_zomega_prime_power(eta: ZRootTwo, k: i32) -> Result<Option<
 
 pub fn adj_decompose_selfcoprime(
     xi: ZRootTwo,
-    diophantine_timeout: u128,
-    factoring_timeout: u128,
     start_time: Instant,
+    diophantine_data: &mut DiophantineData,
 ) -> Result<Option<ZOmega>, String> {
     let mut facs: Vec<(ZRootTwo, i32)> = vec![(xi.clone(), 1)];
     let mut t = ZOmega::from_int(IBig::ONE);
     while let Some((eta, k)) = facs.pop() {
-        if start_time.elapsed().as_millis() >= diophantine_timeout {
+        if start_time.elapsed().as_millis() >= diophantine_data.diophantine_timeout {
             return Ok(None);
         }
 
-        match adj_decompose_zomega_prime_power(eta.clone(), k) {
+        match adj_decompose_zomega_prime_power(eta.clone(), k, &mut diophantine_data.rng) {
             Ok(None) => {
                 let mut n = eta.norm();
                 if n < IBig::ZERO {
                     n = -n;
                 }
-                let individual_timeout = std::cmp::min(factoring_timeout, 15); // Max 15ms per factor
-                if let Some(fac_n) = find_factor(&n, individual_timeout, 128) {
+                let individual_timeout = std::cmp::min(diophantine_data.factoring_timeout, 15); // Max 15ms per factor
+                if let Some(fac_n) = find_factor(&n, individual_timeout, 128, &mut diophantine_data.rng) { //  &mut diophantine_data.rng) {
                     let fac = ZRootTwo::gcd(xi.clone(), ZRootTwo::from_int(fac_n));
                     facs.push((eta / fac.clone(), k));
                     facs.push((fac, k));
@@ -766,20 +764,19 @@ pub fn adj_decompose_selfcoprime(
 
 fn adj_decompose(
     xi: ZRootTwo,
-    diophantine_timeout: u128,
-    factoring_timeout: u128,
     start_time: Instant,
+    diophantine_data: &mut DiophantineData,
 ) -> Result<Option<ZOmega>, String> {
     if xi == ZRootTwo::from_int(IBig::ZERO) {
         return Ok(Some(ZOmega::from_int(IBig::ZERO)));
     }
     let d = ZRootTwo::gcd(xi.clone(), xi.conj_sq2());
     let eta = xi / d.clone();
-    let t1 = adj_decompose_selfassociate(d, diophantine_timeout, factoring_timeout, start_time);
+    let t1 = adj_decompose_selfassociate(d, start_time, diophantine_data);
     match t1 {
         Ok(Some(t1_val)) => {
             let t2 =
-                adj_decompose_selfcoprime(eta, diophantine_timeout, factoring_timeout, start_time);
+                adj_decompose_selfcoprime(eta, start_time, diophantine_data);
             match t2 {
                 Ok(Some(t2_val)) => Ok(Some(t1_val * t2_val)),
                 Ok(None) => Ok(None),
@@ -792,9 +789,8 @@ fn adj_decompose(
 }
 fn diophantine(
     xi: &ZRootTwo,
-    diophantine_timeout: u128,
-    factoring_timeout: u128,
     start_time: Instant,
+    diophantine_data: &mut DiophantineData,
 ) -> Result<Option<ZOmega>, String> {
     if xi == &ZRootTwo::from_int(IBig::ZERO) {
         return Ok(Some(ZOmega::from_int(IBig::ZERO)));
@@ -805,9 +801,8 @@ fn diophantine(
     }
     let t = adj_decompose(
         xi.clone(),
-        diophantine_timeout,
-        factoring_timeout,
         start_time,
+        diophantine_data,
     );
     match t {
         Ok(Some(t)) => {
@@ -829,10 +824,9 @@ fn diophantine(
 type DiophantineCacheType = LazyLock<Mutex<HashMap<(IBig, IBig), Option<DOmega>>>>;
 static DIOPHANTINE_CACHE: DiophantineCacheType = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub fn diophantine_dyadic(
+pub(crate) fn diophantine_dyadic(
     xi: DRootTwo,
-    diophantine_timeout: u128,
-    factoring_timeout: u128,
+    diophantine_data: &mut DiophantineData,
 ) -> Option<DOmega> {
     let cache_key = (xi.alpha.a.clone(), xi.alpha.b.clone());
     if let Ok(cache) = DIOPHANTINE_CACHE.try_lock() {
@@ -849,25 +843,29 @@ pub fn diophantine_dyadic(
     } else {
         xi.alpha
     };
+
     let alpha_bits = std::cmp::max(alpha.a.bit_len(), alpha.b.bit_len());
     let (optimized_diophantine_timeout, optimized_factoring_timeout) = if alpha_bits > 1000 {
         (
-            std::cmp::min(diophantine_timeout, 50),
-            std::cmp::min(factoring_timeout, 10),
+            std::cmp::min(diophantine_data.diophantine_timeout, 50),
+            std::cmp::min(diophantine_data.factoring_timeout, 10),
         )
     } else {
         (
-            std::cmp::min(diophantine_timeout, 15),
-            std::cmp::min(factoring_timeout, 3),
+            std::cmp::min(diophantine_data.diophantine_timeout, 15),
+            std::cmp::min(diophantine_data.factoring_timeout, 3),
         )
     };
+
+    // Ugh. I don't like mutating this. But I don't see an easy way around it.
+    diophantine_data.diophantine_timeout = optimized_diophantine_timeout;
+    diophantine_data.factoring_timeout = optimized_factoring_timeout;
 
     let start_time = Instant::now();
     let t = diophantine(
         &alpha,
-        optimized_diophantine_timeout,
-        optimized_factoring_timeout,
         start_time,
+        diophantine_data,
     );
     let result = match t {
         Err(_) => None,

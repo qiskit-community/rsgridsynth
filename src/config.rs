@@ -1,18 +1,25 @@
-use crate::common::ib_to_bf_prec;
-use crate::common::set_prec_bits;
+use rand::{SeedableRng, rngs::StdRng};
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::{IBig, UBig};
 use std::str::FromStr;
+use crate::common::ib_to_bf_prec;
+use crate::common::set_prec_bits;
 
 #[derive(Debug)]
-pub struct GridSynthConfig {
-    pub theta: FBig<HalfEven>,
-    pub epsilon: FBig<HalfEven>,
+pub struct DiophantineData {
     pub diophantine_timeout: u128,
     pub factoring_timeout: u128,
+    pub rng: StdRng,
+}
+
+#[derive(Debug)]
+pub struct GridSynthConfig{
+    pub theta: FBig<HalfEven>,
+    pub epsilon: FBig<HalfEven>,
     pub verbose: bool,
     pub measure_time: bool,
+    pub diophantine_data: DiophantineData,
 }
 
 pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
@@ -59,7 +66,7 @@ pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
 }
 
 /// Creates the default config to easily call the code from other rust packages.
-pub fn config_from_theta_epsilon(theta: f64, epsilon: f64) -> GridSynthConfig {
+pub fn config_from_theta_epsilon(theta: f64, epsilon: f64, seed: u64) -> GridSynthConfig {
     let (theta_num, theta_den) = parse_decimal_with_exponent(&theta.to_string()).unwrap();
     let theta = ib_to_bf_prec(theta_num) / ib_to_bf_prec(theta_den);
     let (epsilon_num, epsilon_den) = parse_decimal_with_exponent(&epsilon.to_string()).unwrap();
@@ -69,17 +76,19 @@ pub fn config_from_theta_epsilon(theta: f64, epsilon: f64) -> GridSynthConfig {
     let prec_bits: usize = calculated_prec_bits;
     set_prec_bits(prec_bits);
     let epsilon = ib_to_bf_prec(epsilon_num) / ib_to_bf_prec(epsilon_den);
-    let dtimeout = 200u128;
+    let diophantine_timeout = 200u128;
     let factoring_timeout = 50u128;
     let verbose = false;
     let time = false;
 
+    let rng: StdRng = SeedableRng::seed_from_u64(seed);
+    let diophantine_data = DiophantineData {diophantine_timeout, factoring_timeout, rng};
+
     GridSynthConfig {
         theta,
         epsilon,
-        diophantine_timeout: dtimeout,
-        factoring_timeout,
         verbose,
         measure_time: time,
+        diophantine_data,
     }
 }
