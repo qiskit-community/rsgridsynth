@@ -168,3 +168,34 @@ pub fn solve_scaled_odgp_with_parity(
     let sol = solve_scaled_odgp(sub_i, sub_j, k - 1);
     sol.into_iter().map(|a| a + offset.clone()).collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_empty_interval() -> (Interval, Interval) {
+        let inti = Interval::new(
+            FBig::<HalfEven>::from(4),
+            FBig::<HalfEven>::from(2),
+        );
+        let intj = Interval::new(
+            FBig::<HalfEven>::from(2),
+            FBig::<HalfEven>::from(4),
+        );
+        (inti, intj)
+    }
+
+    #[test]
+    fn test_empty_interval() {
+        let (inti, intj) = create_empty_interval();
+        let mut result = solve_odgp(inti, intj);
+        assert!(result.next().is_none());
+    }
+
+    #[test]
+    fn test_use_empty_interval() {
+        let (inti, intj) = create_empty_interval();
+        let result = solve_scaled_odgp(inti, intj, 2);
+        assert!(result.is_empty());
+    }
+}
