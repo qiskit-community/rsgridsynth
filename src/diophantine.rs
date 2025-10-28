@@ -844,25 +844,22 @@ pub(crate) fn diophantine_dyadic(
         xi.alpha
     };
 
-    // TODO: Find a solution for this. Borrowing, share, move, etc. problems
-    // let alpha_bits = std::cmp::max(alpha.a.bit_len(), alpha.b.bit_len());
-    // let (optimized_diophantine_timeout, optimized_factoring_timeout) = if alpha_bits > 1000 {
-    //     (
-    //         std::cmp::min(diophantine_data.diophantine_timeout, 50),
-    //         std::cmp::min(diophantine_data.factoring_timeout, 10),
-    //     )
-    // } else {
-    //     (
-    //         std::cmp::min(diophantine_data.diophantine_timeout, 15),
-    //         std::cmp::min(diophantine_data.factoring_timeout, 3),
-    //     )
-    // };
+    let alpha_bits = std::cmp::max(alpha.a.bit_len(), alpha.b.bit_len());
+    let (optimized_diophantine_timeout, optimized_factoring_timeout) = if alpha_bits > 1000 {
+        (
+            std::cmp::min(diophantine_data.diophantine_timeout, 50),
+            std::cmp::min(diophantine_data.factoring_timeout, 10),
+        )
+    } else {
+        (
+            std::cmp::min(diophantine_data.diophantine_timeout, 15),
+            std::cmp::min(diophantine_data.factoring_timeout, 3),
+        )
+    };
 
-    // let diophantine_data_new = DiophantineData {
-    //     diophantine_timeout: optimized_diophantine_timeout,
-    //     factoring_timeout: optimized_factoring_timeout,
-    //     rng: diophantine_data.rng
-    // };
+    // Ugh. I don't like mutating this. But I don't see an easy way around it.
+    diophantine_data.diophantine_timeout = optimized_diophantine_timeout;
+    diophantine_data.factoring_timeout = optimized_factoring_timeout;
 
     let start_time = Instant::now();
     let t = diophantine(
