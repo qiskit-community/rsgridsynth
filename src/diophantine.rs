@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2025 Shun Yamamoto and Nobuyuki Yoshioka, and IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::Rng;
 use crate::ring::{DOmega, DRootTwo, ZOmega, ZRootTwo};
 use crate::config::DiophantineData;
 use dashu_base::{BitTest, Gcd, RemEuclid};

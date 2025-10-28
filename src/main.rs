@@ -1,7 +1,7 @@
 // Copyright (c) 2025 IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{SeedableRng, rngs::StdRng};
 use clap::{Arg, Command};
 use dashu_int::UBig;
 use log::info;
@@ -134,7 +134,7 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         .parse()
         .unwrap();
     let rng: StdRng = SeedableRng::seed_from_u64(seed);
-    let diophantine_data = DiophantineData {diophantine_timeout, factoring_timeout, rng: rng};
+    let diophantine_data = DiophantineData {diophantine_timeout, factoring_timeout, rng};
 
     GridSynthConfig {
         theta,

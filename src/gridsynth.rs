@@ -1,9 +1,9 @@
 // Copyright (c) 2024-2025 Shun Yamamoto and Nobuyuki Yoshioka, and IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
-use rand::{Rng, SeedableRng, rngs::StdRng};
+//use rand::{Rng, SeedableRng, rngs::StdRng};
 use crate::common::{cos_fbig, fb_with_prec, get_prec_bits, ib_to_bf_prec, sin_fbig};
-use crate::config::{GridSynthConfig, DiophantineData};
+use crate::config::GridSynthConfig;
 use crate::diophantine::diophantine_dyadic;
 use crate::math::solve_quadratic;
 use crate::region::Ellipse;

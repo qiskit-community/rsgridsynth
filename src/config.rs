@@ -1,5 +1,4 @@
-use std::time::{Instant};
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{SeedableRng, rngs::StdRng};
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::{IBig, UBig};
@@ -8,24 +7,19 @@ use crate::common::ib_to_bf_prec;
 use crate::common::set_prec_bits;
 
 #[derive(Debug)]
-pub(crate) struct DiophantineData {
-//struct DiophantineData<'a> {
+pub struct DiophantineData {
     pub diophantine_timeout: u128,
     pub factoring_timeout: u128,
     pub rng: StdRng,
-//    start_time: Instant,
-//    rng: &'a StdRng,
 }
 
 #[derive(Debug)]
-//pub struct GridSynthConfig<'a> {
 pub struct GridSynthConfig{
     pub theta: FBig<HalfEven>,
     pub epsilon: FBig<HalfEven>,
     pub verbose: bool,
     pub measure_time: bool,
     pub diophantine_data: DiophantineData,
-//    pub diophantine_data: DiophantineData<'a>,
 }
 
 pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
@@ -89,7 +83,7 @@ pub fn config_from_theta_epsilon(theta: f64, epsilon: f64, seed: u64) -> GridSyn
 
     let rng: StdRng = SeedableRng::seed_from_u64(seed);
 //    let start_time = Instant::now();
-    let diophantine_data = DiophantineData {diophantine_timeout, factoring_timeout, rng: rng};
+    let diophantine_data = DiophantineData {diophantine_timeout, factoring_timeout, rng};
 
     GridSynthConfig {
         theta,
