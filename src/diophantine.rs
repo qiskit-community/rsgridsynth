@@ -104,7 +104,6 @@ fn modpow(mut base: IBig, exp: &IBig, modulus: &IBig) -> IBig {
     result
 }
 
-//pub fn is_prime(mut n: IBig, iterations: usize, rng: &mut StdRng) -> bool {
 pub fn is_prime<R: Rng + ?Sized>(mut n: IBig, iterations: usize, rng: &mut R) -> bool {
     if n < IBig::ZERO {
         n = -n;
@@ -149,7 +148,6 @@ pub fn is_prime<R: Rng + ?Sized>(mut n: IBig, iterations: usize, rng: &mut R) ->
         r += 1;
     }
 
-//    let mut rng = rand::rng();
     let bits = n.bit_len();
     let n_minus1 = &n - 1;
 
@@ -185,7 +183,6 @@ pub fn sqrt_negative_one<R: Rng + ?Sized>(p: &IBig, trials: usize, rng: &mut R) 
         }
     }
 
-//    let mut rng = rand::rng();
     let bits = p.bit_len();
     let reduced_trials = std::cmp::min(trials, 8); // Reduce trials for performance
 
@@ -239,7 +236,6 @@ fn root_mod<R: Rng + ?Sized>(x: IBig, p: &IBig, trials: usize, rng: &mut R) -> O
         return None;
     }
 
-//    let mut rng = rand::rng();
     let bits = p.bit_len();
     let reduced_trials = std::cmp::min(trials, 8); // Reduce trials for performance
 
@@ -431,7 +427,6 @@ fn find_factor<R: Rng + ?Sized>(n: &IBig, timeout_ms: u128, _m: usize, rng: &mut
 
 fn pollard_rho<R: Rng + ?Sized>(n: &IBig, timeout_ms: u128, rng: &mut R) -> Option<IBig> {
     let start = Instant::now();
-//    let mut rng = rand::rng();
     for _ in 0..5 {
         if start.elapsed().as_millis() >= timeout_ms {
             return None;
@@ -556,8 +551,7 @@ fn adj_decompose_int(
             return Ok(None);
         }
 
-//        let mut rng2 = rand::rng();  Don't need this after all.
-        match adj_decompose_int_prime_power(&p, k, &mut diophantine_data.rng) { // &mut diophantine_data.rng) {
+        match adj_decompose_int_prime_power(&p, k, &mut diophantine_data.rng) {
             Ok(None) => {
                 let individual_timeout = std::cmp::min(diophantine_data.factoring_timeout, 20);
                 if let Some(fac) = find_factor(&p, individual_timeout, 128, &mut diophantine_data.rng) {

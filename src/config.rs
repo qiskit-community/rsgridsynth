@@ -82,7 +82,6 @@ pub fn config_from_theta_epsilon(theta: f64, epsilon: f64, seed: u64) -> GridSyn
     let time = false;
 
     let rng: StdRng = SeedableRng::seed_from_u64(seed);
-//    let start_time = Instant::now();
     let diophantine_data = DiophantineData {diophantine_timeout, factoring_timeout, rng};
 
     GridSynthConfig {

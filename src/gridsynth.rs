@@ -1,7 +1,6 @@
 // Copyright (c) 2024-2025 Shun Yamamoto and Nobuyuki Yoshioka, and IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
-//use rand::{Rng, SeedableRng, rngs::StdRng};
 use crate::common::{cos_fbig, fb_with_prec, get_prec_bits, ib_to_bf_prec, sin_fbig};
 use crate::config::GridSynthConfig;
 use crate::diophantine::diophantine_dyadic;
@@ -293,14 +292,12 @@ fn search_for_solution(
         crate::region::Rectangle,
         crate::region::Rectangle,
     ),
-    //    verbose: bool,
     config: &mut GridSynthConfig,
-//    diophantine_data: &DiophantineData,
 ) -> DOmegaUnitary {
     let mut k = 0;
     let mut time_of_solve_tdgp = Duration::ZERO;
     let mut time_of_diophantine_dyadic = Duration::ZERO;
-    
+
     loop {
         let start_tdgp = if config.measure_time {
             Some(Instant::now())
@@ -362,8 +359,6 @@ fn gridsynth(config: &mut GridSynthConfig) -> DOmegaUnitary {
         &unit_disk,
         &transformed,
         config,
-        // config.verbose,
-        // &config.diophantine_data,
     )
 }
 
