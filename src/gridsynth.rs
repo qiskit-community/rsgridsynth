@@ -49,6 +49,7 @@ pub struct EpsilonRegion {
     ellipse: Ellipse,
 }
 
+
 impl EpsilonRegion {
     pub fn new(theta: FBig<HalfEven>, epsilon: FBig<HalfEven>) -> Self {
         let ctx: Context<mode::HalfEven> = Context::<mode::HalfEven>::new(get_prec_bits());
@@ -201,14 +202,11 @@ fn process_solution_candidate(mut z: DOmega, mut w_val: DOmega) -> DOmegaUnitary
 }
 
 fn process_solutions(
+    config: &mut GridSynthConfig,
     solutions: Vec<DOmega>,
-    diophantine_timeout: u128,
-    factoring_timeout: u128,
-    measure_time: bool,
     time_of_diophantine_dyadic: &mut Duration,
-    verbose: bool,
 ) -> Option<DOmegaUnitary> {
-    let start_diophantine = if measure_time {
+    let start_diophantine = if config.measure_time {
         Some(Instant::now())
     } else {
         None
@@ -220,17 +218,17 @@ fn process_solutions(
         }
 
         let xi = DRootTwo::from_int(IBig::ONE) - DRootTwo::from_domega(z.conj() * &z);
-        if let Some(w_val) = diophantine_dyadic(xi, diophantine_timeout, factoring_timeout) {
+        if let Some(w_val) = diophantine_dyadic(xi, &mut config.diophantine_data) {
             if let Some(start) = start_diophantine {
                 *time_of_diophantine_dyadic += start.elapsed();
-                if measure_time {
+                if config.measure_time {
                     debug!(
                         "time of diophantine_dyadic: {:.3} ms",
                         time_of_diophantine_dyadic.as_secs_f64() * 1000.0
                     );
                 }
             }
-            if verbose {
+            if config.verbose {
                 debug!("------------------");
             }
             return Some(process_solution_candidate(z, w_val));
@@ -259,7 +257,7 @@ fn setup_regions_and_transform(
         crate::region::Rectangle,
     ),
 ) {
-    let epsilon_region = EpsilonRegion::new(theta, epsilon);
+   let epsilon_region = EpsilonRegion::new(theta, epsilon);
     let unit_disk = UnitDisk::new();
 
     let start_upright = if measure_time {
@@ -294,46 +292,40 @@ fn search_for_solution(
         crate::region::Rectangle,
         crate::region::Rectangle,
     ),
-    diophantine_timeout: u128,
-    factoring_timeout: u128,
-    verbose: bool,
-    measure_time: bool,
+    config: &mut GridSynthConfig,
 ) -> DOmegaUnitary {
     let mut k = 0;
     let mut time_of_solve_tdgp = Duration::ZERO;
     let mut time_of_diophantine_dyadic = Duration::ZERO;
 
     loop {
-        let start_tdgp = if measure_time {
+        let start_tdgp = if config.measure_time {
             Some(Instant::now())
         } else {
             None
         };
-        let sol = solve_tdgp(
+        let solution = solve_tdgp(
             epsilon_region,
             unit_disk,
             &transformed.0,
             &transformed.3,
             &transformed.4,
             k,
-            verbose,
+            config.verbose,
         );
-        if verbose {
-            info!("k = {}, found {} candidates", k, sol.len());
+        if config.verbose {
+            info!("k = {}, found {} candidates", k, solution.len());
         }
         if let Some(start) = start_tdgp {
             time_of_solve_tdgp += start.elapsed();
         }
 
         if let Some(result) = process_solutions(
-            sol,
-            diophantine_timeout,
-            factoring_timeout,
-            measure_time,
+            config,
+            solution,
             &mut time_of_diophantine_dyadic,
-            verbose,
         ) {
-            if measure_time {
+            if config.measure_time {
                 debug!(
                     "time of solve_TDGP: {:.3} ms",
                     time_of_solve_tdgp.as_secs_f64() * 1000.0
@@ -358,43 +350,26 @@ fn search_for_solution(
 ///
 /// # Returns
 /// A DOmegaUnitary representing the optimal Clifford+T approximation
-fn gridsynth(
-    theta: FBig<HalfEven>,
-    epsilon: FBig<HalfEven>,
-    diophantine_timeout: u128,
-    factoring_timeout: u128,
-    verbose: bool,
-    measure_time: bool,
-) -> DOmegaUnitary {
+fn gridsynth(config: &mut GridSynthConfig) -> DOmegaUnitary {
     let (epsilon_region, unit_disk, transformed) =
-        setup_regions_and_transform(theta, epsilon, verbose, measure_time);
+        setup_regions_and_transform(config.theta.clone(), config.epsilon.clone(), config.verbose, config.measure_time);
 
     search_for_solution(
         &epsilon_region,
         &unit_disk,
         &transformed,
-        diophantine_timeout,
-        factoring_timeout,
-        verbose,
-        measure_time,
+        config,
     )
 }
 
-pub fn gridsynth_gates(config: &GridSynthConfig) -> String {
+pub fn gridsynth_gates(config: &mut GridSynthConfig) -> String {
     let start_total = if config.measure_time {
         Some(Instant::now())
     } else {
         None
     };
 
-    let u_approx = gridsynth(
-        config.theta.clone(),
-        config.epsilon.clone(),
-        config.diophantine_timeout,
-        config.factoring_timeout,
-        config.verbose,
-        config.measure_time,
-    );
+    let u_approx = gridsynth(config);
 
     let start_decompose = if config.measure_time {
         Some(Instant::now())
