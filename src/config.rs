@@ -1,10 +1,10 @@
-use rand::{SeedableRng, rngs::StdRng};
+use crate::common::ib_to_bf_prec;
+use crate::common::set_prec_bits;
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::{IBig, UBig};
+use rand::{rngs::StdRng, SeedableRng};
 use std::str::FromStr;
-use crate::common::ib_to_bf_prec;
-use crate::common::set_prec_bits;
 
 #[derive(Debug)]
 pub struct DiophantineData {
@@ -14,7 +14,7 @@ pub struct DiophantineData {
 }
 
 #[derive(Debug)]
-pub struct GridSynthConfig{
+pub struct GridSynthConfig {
     pub theta: FBig<HalfEven>,
     pub epsilon: FBig<HalfEven>,
     pub verbose: bool,
@@ -38,17 +38,13 @@ pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
     };
 
     let mut parts = base_str.split('.');
-    let int_part = match parts.next()
-    {
+    let int_part = match parts.next() {
         Some(part) => part,
-        _ => return None
+        _ => return None,
     };
-    let frac_part = match parts.next() {
-        Some(part) => part,
-        _ => ""
-    };
+    let frac_part: &str = parts.next().unwrap_or_default();
     if parts.next().is_some() {
-        return None
+        return None;
     }
     let digits = format!("{}{}", int_part, frac_part);
     let decimal_digits = frac_part.len() as i32;
@@ -89,7 +85,11 @@ pub fn config_from_theta_epsilon(theta: f64, epsilon: f64, seed: u64) -> GridSyn
     let time = false;
 
     let rng: StdRng = SeedableRng::seed_from_u64(seed);
-    let diophantine_data = DiophantineData {diophantine_timeout, factoring_timeout, rng};
+    let diophantine_data = DiophantineData {
+        diophantine_timeout,
+        factoring_timeout,
+        rng,
+    };
 
     GridSynthConfig {
         theta,

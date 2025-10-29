@@ -14,8 +14,7 @@ const LAMBDA: ZRootTwo = ZRootTwo {
     b: IBig::ONE,
 };
 
-pub fn solve_odgp(i: Interval, j: Interval) -> impl Iterator <Item = ZRootTwo> {
-
+pub fn solve_odgp(i: Interval, j: Interval) -> impl Iterator<Item = ZRootTwo> {
     // Can't return two different iterator types. So we can't do this check.
     // I checked with dbg! to confirm that omitting this check is ok:
     // If the condition is true, then an empty iterator is returned at the end.
@@ -34,12 +33,13 @@ pub fn solve_odgp(i: Interval, j: Interval) -> impl Iterator <Item = ZRootTwo> {
     let sub_i = i.sub_ref(&alpha.to_real());
     let sub_j = j.sub_ref(&alpha.conj_sq2().to_real());
     let sol = solve_odgp_internal(&sub_i, &sub_j);
-    return sol.into_iter().map(move |beta| &beta + &alpha)
+    sol.into_iter()
+        .map(move |beta| &beta + &alpha)
         .filter(move |beta| {
             let real = beta.to_real();
             let real_conj = beta.conj_sq2().to_real();
             i.within(&real) && j.within(&real_conj)
-        });
+        })
 }
 
 //
@@ -47,8 +47,10 @@ fn solve_odgp_internal(i: &Interval, j: &Interval) -> Vec<ZRootTwo> {
     if i.width() < ib_to_bf_prec(IBig::ZERO) || j.width() < ib_to_bf_prec(IBig::ZERO) {
         return vec![];
     } else if i.width() > ib_to_bf_prec(IBig::ZERO) && j.width() <= ib_to_bf_prec(IBig::ZERO) {
-        return solve_odgp_internal(j, i).into_iter()
-            .map(|beta| beta.conj_sq2()).collect();
+        return solve_odgp_internal(j, i)
+            .into_iter()
+            .map(|beta| beta.conj_sq2())
+            .collect();
     }
 
     let n = if j.width() <= ib_to_bf_prec(IBig::ZERO) {
@@ -58,7 +60,6 @@ fn solve_odgp_internal(i: &Interval, j: &Interval) -> Vec<ZRootTwo> {
     };
 
     if n == IBig::ZERO {
-
         let sum_min = &i.l + &j.l;
         let div_min: FBig<HalfEven> = sum_min / 2;
         let a_min: IBig = div_min.ceil().try_into().unwrap();
@@ -110,12 +111,17 @@ fn solve_odgp_internal(i: &Interval, j: &Interval) -> Vec<ZRootTwo> {
     let lambda_conj_sq2_n_f = lambda_conj_sq2_n.to_real();
     let scaled_i = i.scale(&lambda_n_f);
     let scaled_j = j.scale(&lambda_conj_sq2_n_f);
-    let sol = solve_odgp_internal(&scaled_i, &scaled_j).into_iter()
-        .map(|beta| beta * lambda_inv_n.clone()).collect();
-    sol
+    solve_odgp_internal(&scaled_i, &scaled_j)
+        .into_iter()
+        .map(|beta| beta * lambda_inv_n.clone())
+        .collect()
 }
 
-pub fn solve_odgp_with_parity(i: Interval, j: Interval, beta: &DRootTwo) -> impl Iterator<Item = ZRootTwo> {
+pub fn solve_odgp_with_parity(
+    i: Interval,
+    j: Interval,
+    beta: &DRootTwo,
+) -> impl Iterator<Item = ZRootTwo> {
     let p = beta.parity();
     let scale_factor1 = sqrt2() / 2;
     let scale_factor2 = -sqrt2() / 2;
@@ -125,7 +131,6 @@ pub fn solve_odgp_with_parity(i: Interval, j: Interval, beta: &DRootTwo) -> impl
 
     sol.into_iter()
         .map(move |alpha| (alpha * ZRootTwo::new(IBig::ZERO, IBig::ONE)) + &p)
-
 }
 
 pub fn solve_scaled_odgp(i: Interval, j: Interval, k: i64) -> Vec<DRootTwo> {
@@ -137,7 +142,6 @@ pub fn solve_scaled_odgp(i: Interval, j: Interval, k: i64) -> Vec<DRootTwo> {
         j.scale(&neg_scale)
     };
     solve_odgp(i.scale(&scale), scaled_j)
-        .into_iter()
         .map(|alpha| DRootTwo::new(alpha, k))
         .collect()
 }
@@ -151,7 +155,6 @@ pub fn solve_scaled_odgp_with_parity(
     if k == 0 {
         let base = beta.renew_denomexp(0);
         return solve_odgp_with_parity(i, j, &base)
-            .into_iter()
             .map(DRootTwo::from_zroottwo)
             .collect();
     }
@@ -174,14 +177,8 @@ mod tests {
     use super::*;
 
     fn create_empty_interval() -> (Interval, Interval) {
-        let inti = Interval::new(
-            FBig::<HalfEven>::from(4),
-            FBig::<HalfEven>::from(2),
-        );
-        let intj = Interval::new(
-            FBig::<HalfEven>::from(2),
-            FBig::<HalfEven>::from(4),
-        );
+        let inti = Interval::new(FBig::<HalfEven>::from(4), FBig::<HalfEven>::from(2));
+        let intj = Interval::new(FBig::<HalfEven>::from(2), FBig::<HalfEven>::from(4));
         (inti, intj)
     }
 

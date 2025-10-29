@@ -10,7 +10,6 @@ use rsgridsynth::gridsynth::gridsynth_gates;
 //         .value()
 // }
 
-
 fn main() {
     // let theta = PI.clone() / to_fbig(16.0);
     // let epsilon = to_fbig(1e-10);
@@ -22,4 +21,3 @@ fn main() {
     let gates = gridsynth_gates(&mut gridsynth_config);
     println!("{}", gates);
 }
-

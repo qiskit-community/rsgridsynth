@@ -181,7 +181,7 @@ impl Add for ZRootTwo {
 impl Add<&ZRootTwo> for &ZRootTwo {
     type Output = ZRootTwo;
 
-    fn add(self, other: & ZRootTwo) -> ZRootTwo {
+    fn add(self, other: &ZRootTwo) -> ZRootTwo {
         ZRootTwo::new(&self.a + &other.a, &self.b + &other.b)
     }
 }
@@ -195,11 +195,10 @@ impl Add<IBig> for ZRootTwo {
 
 impl Add<&IBig> for ZRootTwo {
     type Output = Self;
-    fn add(self, other: & IBig) -> Self {
+    fn add(self, other: &IBig) -> Self {
         self + ZRootTwo::from_borrowed_int(other)
     }
 }
-
 
 impl AddAssign<&ZRootTwo> for ZRootTwo {
     fn add_assign(&mut self, rhs: &ZRootTwo) {
