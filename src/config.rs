@@ -37,12 +37,19 @@ pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
         None => (body, "0"),
     };
 
-    let parts: Vec<&str> = base_str.split('.').collect();
-    if parts.len() > 2 {
-        return None;
+    let mut parts = base_str.split('.');
+    let int_part = match parts.next()
+    {
+        Some(part) => part,
+        _ => return None
+    };
+    let frac_part = match parts.next() {
+        Some(part) => part,
+        _ => ""
+    };
+    if parts.next().is_some() {
+        return None
     }
-    let int_part = parts[0];
-    let frac_part = if parts.len() == 2 { parts[1] } else { "" };
     let digits = format!("{}{}", int_part, frac_part);
     let decimal_digits = frac_part.len() as i32;
 
