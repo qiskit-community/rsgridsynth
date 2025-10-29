@@ -30,6 +30,13 @@ impl ZRootTwo {
         }
     }
 
+    pub fn from_borrowed_int(x: &IBig) -> Self {
+        Self {
+            a: x.clone(),
+            b: IBig::ZERO,
+        }
+    }
+
     pub fn parity(&self) -> IBig {
         &self.a & IBig::ONE
     }
@@ -171,12 +178,28 @@ impl Add for ZRootTwo {
     }
 }
 
+impl Add<&ZRootTwo> for &ZRootTwo {
+    type Output = ZRootTwo;
+
+    fn add(self, other: & ZRootTwo) -> ZRootTwo {
+        ZRootTwo::new(&self.a + &other.a, &self.b + &other.b)
+    }
+}
+
 impl Add<IBig> for ZRootTwo {
     type Output = Self;
     fn add(self, other: IBig) -> Self {
         self + ZRootTwo::from_int(other)
     }
 }
+
+impl Add<&IBig> for ZRootTwo {
+    type Output = Self;
+    fn add(self, other: & IBig) -> Self {
+        self + ZRootTwo::from_borrowed_int(other)
+    }
+}
+
 
 impl AddAssign<&ZRootTwo> for ZRootTwo {
     fn add_assign(&mut self, rhs: &ZRootTwo) {
