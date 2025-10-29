@@ -1,14 +1,14 @@
 // Copyright (c) 2024-2025 Shun Yamamoto and Nobuyuki Yoshioka, and IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
-use rand::Rng;
-use crate::ring::{DOmega, DRootTwo, ZOmega, ZRootTwo};
 use crate::config::DiophantineData;
+use crate::ring::{DOmega, DRootTwo, ZOmega, ZRootTwo};
 use dashu_base::{BitTest, Gcd, RemEuclid};
 use dashu_int::ops::Abs;
 use dashu_int::{IBig, UBig};
 use log::warn;
 use once_cell::sync::Lazy;
+use rand::Rng;
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 use std::{
@@ -22,13 +22,12 @@ static PRIMALITY_CACHE: LazyLock<Mutex<HashMap<IBig, bool>>> =
 type SqrtCacheType = LazyLock<Mutex<HashMap<(IBig, IBig), Option<IBig>>>>;
 static SQRT_CACHE: SqrtCacheType = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-
 // WARN: Distribution of random_ubig is different from the rng.random_range
 fn random_ubig<R>(bits: usize, rng: &mut R) -> UBig
 where
     R: Rng + ?Sized,
 {
-    let mut bytes = vec![0u8; (bits + 7) / 8];
+    let mut bytes = vec![0u8; bits.div_ceil(8)];
     rng.fill_bytes(&mut bytes);
     let mut n = UBig::from_le_bytes(&bytes);
     n |= UBig::ONE << (bits - 1);
@@ -353,7 +352,12 @@ fn decompose_relatively_prime(mut factors: Vec<(IBig, i32)>) -> (IBig, Vec<(IBig
 static FACTOR_CACHE: LazyLock<Mutex<HashMap<IBig, Option<IBig>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-fn find_factor<R: Rng + ?Sized>(n: &IBig, timeout_ms: u128, _m: usize, rng: &mut R) -> Option<IBig> {
+fn find_factor<R: Rng + ?Sized>(
+    n: &IBig,
+    timeout_ms: u128,
+    _m: usize,
+    rng: &mut R,
+) -> Option<IBig> {
     if n.bit_len() > 1024 || n == &IBig::ZERO || n == &IBig::ONE {
         return None;
     }
@@ -460,8 +464,10 @@ fn pollard_rho<R: Rng + ?Sized>(n: &IBig, timeout_ms: u128, rng: &mut R) -> Opti
     None
 }
 
-          fn adj_decompose_int_prime<R>(p: &IBig, rng: &mut R) -> Result<Option<ZOmega>, String>
-          where R: Rng + ?Sized, {
+fn adj_decompose_int_prime<R>(p: &IBig, rng: &mut R) -> Result<Option<ZOmega>, String>
+where
+    R: Rng + ?Sized,
+{
     let p = p.abs();
     if p == IBig::ZERO || p == IBig::ONE {
         return Ok(Some(ZOmega::from_int(p)));
@@ -520,8 +526,9 @@ fn pollard_rho<R: Rng + ?Sized>(n: &IBig, timeout_ms: u128, rng: &mut R) -> Opti
 }
 
 fn adj_decompose_int_prime_power<R>(p: &IBig, k: i32, rng: &mut R) -> Result<Option<ZOmega>, String>
-          where R : Rng + ?Sized,
-          {
+where
+    R: Rng + ?Sized,
+{
     if k & 1 == 0 {
         Ok(Some(ZOmega::from_int(p.pow((k / 2) as usize))))
     } else {
@@ -554,7 +561,9 @@ fn adj_decompose_int(
         match adj_decompose_int_prime_power(&p, k, &mut diophantine_data.rng) {
             Ok(None) => {
                 let individual_timeout = std::cmp::min(diophantine_data.factoring_timeout, 20);
-                if let Some(fac) = find_factor(&p, individual_timeout, 128, &mut diophantine_data.rng) {
+                if let Some(fac) =
+                    find_factor(&p, individual_timeout, 128, &mut diophantine_data.rng)
+                {
                     facs.push((p / fac.clone(), k));
                     facs.push((fac, k));
                     let (_, new_facs) = decompose_relatively_prime(facs);
@@ -641,7 +650,10 @@ pub fn decompose_relatively_zomega_prime(
     (u, facs)
 }
 
-pub fn adj_decompose_zomega_prime<R: Rng + ?Sized>(eta: ZRootTwo, rng: &mut R) -> Result<Option<ZOmega>, String> {
+pub fn adj_decompose_zomega_prime<R: Rng + ?Sized>(
+    eta: ZRootTwo,
+    rng: &mut R,
+) -> Result<Option<ZOmega>, String> {
     let mut p = eta.norm();
     if p < IBig::ZERO {
         p = -p;
@@ -710,7 +722,11 @@ pub fn adj_decompose_zomega_prime<R: Rng + ?Sized>(eta: ZRootTwo, rng: &mut R) -
     }
 }
 
-pub fn adj_decompose_zomega_prime_power<R: Rng + ?Sized>(eta: ZRootTwo, k: i32, rng: &mut R) -> Result<Option<ZOmega>, String> {
+pub fn adj_decompose_zomega_prime_power<R: Rng + ?Sized>(
+    eta: ZRootTwo,
+    k: i32,
+    rng: &mut R,
+) -> Result<Option<ZOmega>, String> {
     if k & 1 == 0 {
         Ok(Some(ZOmega::from_zroottwo(&eta.pow(&IBig::from(k / 2)))))
     } else {
@@ -741,7 +757,10 @@ pub fn adj_decompose_selfcoprime(
                     n = -n;
                 }
                 let individual_timeout = std::cmp::min(diophantine_data.factoring_timeout, 15); // Max 15ms per factor
-                if let Some(fac_n) = find_factor(&n, individual_timeout, 128, &mut diophantine_data.rng) { //  &mut diophantine_data.rng) {
+                if let Some(fac_n) =
+                    find_factor(&n, individual_timeout, 128, &mut diophantine_data.rng)
+                {
+                    //  &mut diophantine_data.rng) {
                     let fac = ZRootTwo::gcd(xi.clone(), ZRootTwo::from_int(fac_n));
                     facs.push((eta / fac.clone(), k));
                     facs.push((fac, k));
@@ -775,8 +794,7 @@ fn adj_decompose(
     let t1 = adj_decompose_selfassociate(d, start_time, diophantine_data);
     match t1 {
         Ok(Some(t1_val)) => {
-            let t2 =
-                adj_decompose_selfcoprime(eta, start_time, diophantine_data);
+            let t2 = adj_decompose_selfcoprime(eta, start_time, diophantine_data);
             match t2 {
                 Ok(Some(t2_val)) => Ok(Some(t1_val * t2_val)),
                 Ok(None) => Ok(None),
@@ -799,11 +817,7 @@ fn diophantine(
     {
         return Err("No solution".to_string());
     }
-    let t = adj_decompose(
-        xi.clone(),
-        start_time,
-        diophantine_data,
-    );
+    let t = adj_decompose(xi.clone(), start_time, diophantine_data);
     match t {
         Ok(Some(t)) => {
             let xi_associate = ZRootTwo::from_zomega(t.conj() * &t);
@@ -862,11 +876,7 @@ pub(crate) fn diophantine_dyadic(
     diophantine_data.factoring_timeout = optimized_factoring_timeout;
 
     let start_time = Instant::now();
-    let t = diophantine(
-        &alpha,
-        start_time,
-        diophantine_data,
-    );
+    let t = diophantine(&alpha, start_time, diophantine_data);
     let result = match t {
         Err(_) => None,
         Ok(None) => None,

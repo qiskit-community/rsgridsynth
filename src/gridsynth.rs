@@ -49,7 +49,6 @@ pub struct EpsilonRegion {
     ellipse: Ellipse,
 }
 
-
 impl EpsilonRegion {
     pub fn new(theta: FBig<HalfEven>, epsilon: FBig<HalfEven>) -> Self {
         let ctx: Context<mode::HalfEven> = Context::<mode::HalfEven>::new(get_prec_bits());
@@ -257,7 +256,7 @@ fn setup_regions_and_transform(
         crate::region::Rectangle,
     ),
 ) {
-   let epsilon_region = EpsilonRegion::new(theta, epsilon);
+    let epsilon_region = EpsilonRegion::new(theta, epsilon);
     let unit_disk = UnitDisk::new();
 
     let start_upright = if measure_time {
@@ -320,11 +319,7 @@ fn search_for_solution(
             time_of_solve_tdgp += start.elapsed();
         }
 
-        if let Some(result) = process_solutions(
-            config,
-            solution,
-            &mut time_of_diophantine_dyadic,
-        ) {
+        if let Some(result) = process_solutions(config, solution, &mut time_of_diophantine_dyadic) {
             if config.measure_time {
                 debug!(
                     "time of solve_TDGP: {:.3} ms",
@@ -351,15 +346,14 @@ fn search_for_solution(
 /// # Returns
 /// A DOmegaUnitary representing the optimal Clifford+T approximation
 fn gridsynth(config: &mut GridSynthConfig) -> DOmegaUnitary {
-    let (epsilon_region, unit_disk, transformed) =
-        setup_regions_and_transform(config.theta.clone(), config.epsilon.clone(), config.verbose, config.measure_time);
+    let (epsilon_region, unit_disk, transformed) = setup_regions_and_transform(
+        config.theta.clone(),
+        config.epsilon.clone(),
+        config.verbose,
+        config.measure_time,
+    );
 
-    search_for_solution(
-        &epsilon_region,
-        &unit_disk,
-        &transformed,
-        config,
-    )
+    search_for_solution(&epsilon_region, &unit_disk, &transformed, config)
 }
 
 pub fn gridsynth_gates(config: &mut GridSynthConfig) -> String {

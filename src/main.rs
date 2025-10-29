@@ -1,10 +1,10 @@
 // Copyright (c) 2025 IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
-use rand::{SeedableRng, rngs::StdRng};
 use clap::{Arg, Command};
 use dashu_int::UBig;
 use log::info;
+use rand::{rngs::StdRng, SeedableRng};
 
 pub mod common;
 pub mod config;
@@ -24,7 +24,7 @@ use std::{f32::consts::LOG2_10, time::Instant};
 
 use crate::common::{ib_to_bf_prec, set_prec_bits};
 use crate::config::parse_decimal_with_exponent;
-use crate::config::{GridSynthConfig, DiophantineData};
+use crate::config::{DiophantineData, GridSynthConfig};
 use gridsynth::gridsynth_gates;
 
 fn main() {
@@ -128,13 +128,13 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
     let verbose = matches.get_flag("verbose");
     let measure_time = matches.get_flag("time");
 
-    let seed = matches
-        .get_one::<String>("seed")
-        .unwrap()
-        .parse()
-        .unwrap();
+    let seed = matches.get_one::<String>("seed").unwrap().parse().unwrap();
     let rng: StdRng = SeedableRng::seed_from_u64(seed);
-    let diophantine_data = DiophantineData {diophantine_timeout, factoring_timeout, rng};
+    let diophantine_data = DiophantineData {
+        diophantine_timeout,
+        factoring_timeout,
+        rng,
+    };
 
     GridSynthConfig {
         theta,

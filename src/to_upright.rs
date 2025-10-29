@@ -81,7 +81,7 @@ pub fn step_lemma(
             ZOmega::new(IBig::ZERO, IBig::ONE, IBig::ZERO, IBig::ZERO),
             ZOmega::new(IBig::ZERO, IBig::ZERO, IBig::ZERO, IBig::ONE),
         );
-        return reduction(ellipse_pair, op_g_l, op_g_r, &op_x);
+        reduction(ellipse_pair, op_g_l, op_g_r, &op_x)
     } else if ellipse_pair.bias() > check0 || ellipse_pair.bias() < check1 {
         let n: IBig = ((log(ellipse_pair.bias()) / log(LAMBDA.to_real()))
             / ib_to_bf_prec(IBig::from(8)))
@@ -96,9 +96,9 @@ pub fn step_lemma(
         if verbose {
             debug!("S (n={})", n);
         }
-        return reduction(ellipse_pair, op_g_l, op_g_r, &op_s);
+        reduction(ellipse_pair, op_g_l, op_g_r, &op_s)
     } else if ellipse_pair.skew() <= ib_to_bf_prec(IBig::from(15)) {
-        return (ellipse_pair, op_g_l.clone(), op_g_r.clone(), true);
+        (ellipse_pair, op_g_l.clone(), op_g_r.clone(), true)
     } else if ellipse_pair.bias() > check2 || ellipse_pair.bias() < check3 {
         let n: i32 = ((log(ellipse_pair.bias()) / log(LAMBDA.to_real()))
             / ib_to_bf_prec(IBig::from(4)))
@@ -135,12 +135,12 @@ pub fn step_lemma(
             )
             .pow(-n)
         };
-        return (
+        (
             ellipse_pair,
             op_g_l.clone() * op_sigma_l,
             op_sigma_r * op_g_r.clone(),
             false,
-        );
+        )
     } else if (check4.clone()..=check5.clone()).contains(&a.bias())
         && (check4..=check5).contains(&b.bias())
     {
@@ -151,7 +151,7 @@ pub fn step_lemma(
             ZOmega::new(IBig::ZERO, IBig::ZERO, IBig::ONE, IBig::ZERO),
             ZOmega::new(IBig::ONE, IBig::ZERO, IBig::ZERO, IBig::ZERO),
         );
-        return reduction(ellipse_pair, op_g_l, op_g_r, &op_r);
+        reduction(ellipse_pair, op_g_l, op_g_r, &op_r)
     } else if a.b() >= &ib_to_bf_prec(IBig::ZERO) && a.bias() <= check6.clone() {
         if verbose {
             debug!("K");
@@ -160,7 +160,7 @@ pub fn step_lemma(
             ZOmega::new(IBig::NEG_ONE, IBig::NEG_ONE, IBig::ZERO, IBig::ZERO),
             ZOmega::new(IBig::ZERO, IBig::NEG_ONE, IBig::ONE, IBig::ZERO),
         );
-        return reduction(ellipse_pair, op_g_l, op_g_r, &op_k);
+        reduction(ellipse_pair, op_g_l, op_g_r, &op_k)
     } else if a.b() >= &ib_to_bf_prec(IBig::ZERO) && b.bias() <= check6 {
         if verbose {
             debug!("K_conj_sq2");
@@ -169,7 +169,7 @@ pub fn step_lemma(
             ZOmega::new(IBig::ONE, IBig::NEG_ONE, IBig::ZERO, IBig::ZERO),
             ZOmega::new(IBig::ZERO, IBig::NEG_ONE, IBig::NEG_ONE, IBig::ZERO),
         );
-        return reduction(ellipse_pair, op_g_l, op_g_r, &op_kc);
+        reduction(ellipse_pair, op_g_l, op_g_r, &op_kc)
     } else if a.b() >= &ib_to_bf_prec(IBig::ZERO) {
         let n: IBig =
             floorsqrt((a.bias().min(b.bias())) / ib_to_bf_prec(IBig::from(4))).max(IBig::ONE);
@@ -180,7 +180,7 @@ pub fn step_lemma(
             ZOmega::new(IBig::ZERO, IBig::ZERO, IBig::ZERO, IBig::ONE),
             ZOmega::new(IBig::ZERO, IBig::ONE, IBig::ZERO, 2 * n),
         );
-        return reduction(ellipse_pair, op_g_l, op_g_r, &op_a);
+        reduction(ellipse_pair, op_g_l, op_g_r, &op_a)
     } else {
         let n: IBig =
             floorsqrt((a.bias().min(b.bias())) / ib_to_bf_prec(IBig::from(2))).max(IBig::ONE);
@@ -191,7 +191,7 @@ pub fn step_lemma(
             ZOmega::new(IBig::ZERO, IBig::ZERO, IBig::ZERO, IBig::ONE),
             ZOmega::new(n.clone(), IBig::ONE, -n, IBig::ZERO),
         );
-        return reduction(ellipse_pair, op_g_l, op_g_r, &op_b);
+        reduction(ellipse_pair, op_g_l, op_g_r, &op_b)
     }
 }
 
