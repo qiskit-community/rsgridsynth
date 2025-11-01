@@ -40,9 +40,16 @@ fn matrix_multiply_2x2(
 }
 
 #[derive(Debug)]
+pub enum Scale {
+    Exact,
+    UpToPhase,
+}
+
+#[derive(Debug)]
 pub struct EpsilonRegion {
     _theta: FBig<HalfEven>,
     _epsilon: FBig<HalfEven>,
+    scale: Scale,
     d: FBig<HalfEven>,
     z_x: FBig<HalfEven>,
     z_y: FBig<HalfEven>,
@@ -50,7 +57,7 @@ pub struct EpsilonRegion {
 }
 
 impl EpsilonRegion {
-    pub fn new(theta: FBig<HalfEven>, epsilon: FBig<HalfEven>) -> Self {
+    pub fn new(theta: FBig<HalfEven>, epsilon: FBig<HalfEven>, scale: Scale) -> Self {
         let ctx: Context<mode::HalfEven> = Context::<mode::HalfEven>::new(get_prec_bits());
         let one = fb_with_prec(FBig::try_from(1.0).unwrap());
         let two = fb_with_prec(FBig::try_from(2.0).unwrap());
@@ -85,6 +92,7 @@ impl EpsilonRegion {
         Self {
             _theta: theta,
             _epsilon: epsilon,
+            scale,
             d,
             z_x,
             z_y,
@@ -256,7 +264,7 @@ fn setup_regions_and_transform(
         crate::region::Rectangle,
     ),
 ) {
-    let epsilon_region = EpsilonRegion::new(theta, epsilon);
+    let epsilon_region = EpsilonRegion::new(theta, epsilon, Scale::Exact);
     let unit_disk = UnitDisk::new();
 
     let start_upright = if measure_time {
