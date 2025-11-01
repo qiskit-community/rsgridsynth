@@ -8,14 +8,11 @@ use crate::common::ib_to_bf_prec;
 use crate::grid_op::{EllipsePair, GridOp};
 use crate::math::{floorsqrt, log};
 use crate::region::{Ellipse, Rectangle};
-use crate::ring::{ZOmega, ZRootTwo};
+use crate::ring::z_root_two::LAMBDA;
+use crate::ring::ZOmega;
 use crate::tdgp::Region;
 use dashu_int::IBig;
 use num_traits::Pow;
-const LAMBDA: ZRootTwo = ZRootTwo {
-    a: IBig::ONE,
-    b: IBig::ONE,
-};
 
 fn reduction(
     ellipse_pair: EllipsePair,

@@ -10,7 +10,8 @@ fn simple_test() {
     let theta = pi / 8.0;
     let epsilon = 1e-10;
     let seed = 1234;
-    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed);
+    let up_to_phase = false;
+    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed, up_to_phase);
     let gates = gridsynth_gates(&mut gridsynth_config);
     let expected_gates = "HTHTSHTSHTHTSHTHTSHTHTHTSHTSHTHTHTHTHTHTSHTSHTHTSHTSHTSHTSHTHTSHTSHTSHTHTHTHTHTHTSHTSHTHTSHTSHTSHTHTHTSHTSHTSHTSHTSHTSHTSHTHTHTHTHTSHTSHTSHTSHTSHTSHTHTHTHTHTSHTHTSHTHTHTSHTSHTSHTHTSHTSHTHTSHTHTSHTSHTHTSHTHTHTSHTSHTSHTSHTHTHTHTSHTHTHTSHTHTSHTHTHTSHTHTSHTHTSHTXSSWWW";
     assert_eq!(gates, expected_gates);
