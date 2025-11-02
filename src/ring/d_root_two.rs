@@ -1,6 +1,7 @@
 // Copyright (c) 2024-2025 Shun Yamamoto and Nobuyuki Yoshioka, and IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
+use dashu_base::Sign;
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::IBig;
@@ -16,6 +17,30 @@ pub struct DRootTwo {
     pub(crate) alpha: ZRootTwo,
     pub(crate) k: i64,
 }
+
+pub const ONE: DRootTwo = DRootTwo {
+    alpha: ZRootTwo {
+        a: IBig::ONE,
+        b: IBig::ZERO,
+    },
+    k: 0,
+};
+
+pub const DELTA_SQUARED: DRootTwo = DRootTwo {
+    alpha: ZRootTwo {
+        a: IBig::from_parts_const(Sign::Positive, 2),
+        b: IBig::ONE,
+    },
+    k: 0,
+};
+
+pub const DELTA_SQUARED_M: DRootTwo = DRootTwo {
+    alpha: ZRootTwo {
+        a: IBig::from_parts_const(Sign::Positive, 2),
+        b: IBig::NEG_ONE,
+    },
+    k: 0,
+};
 
 impl DRootTwo {
     pub fn new(alpha: ZRootTwo, k: i64) -> Self {

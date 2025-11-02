@@ -2,9 +2,9 @@
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
 mod d_omega;
-mod d_root_two;
+pub mod d_root_two;
 mod z_omega;
-mod z_root_two;
+pub mod z_root_two;
 
 pub use d_omega::DOmega;
 pub use d_root_two::DRootTwo;

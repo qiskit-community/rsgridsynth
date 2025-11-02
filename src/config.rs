@@ -20,6 +20,7 @@ pub struct GridSynthConfig {
     pub verbose: bool,
     pub measure_time: bool,
     pub diophantine_data: DiophantineData,
+    pub up_to_phase: bool,
 }
 
 pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
@@ -69,7 +70,12 @@ pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
 }
 
 /// Creates the default config to easily call the code from other rust packages.
-pub fn config_from_theta_epsilon(theta: f64, epsilon: f64, seed: u64) -> GridSynthConfig {
+pub fn config_from_theta_epsilon(
+    theta: f64,
+    epsilon: f64,
+    seed: u64,
+    up_to_phase: bool,
+) -> GridSynthConfig {
     let (theta_num, theta_den) = parse_decimal_with_exponent(&theta.to_string()).unwrap();
     let theta = ib_to_bf_prec(theta_num) / ib_to_bf_prec(theta_den);
     let (epsilon_num, epsilon_den) = parse_decimal_with_exponent(&epsilon.to_string()).unwrap();
@@ -97,5 +103,6 @@ pub fn config_from_theta_epsilon(theta: f64, epsilon: f64, seed: u64) -> GridSyn
         verbose,
         measure_time: time,
         diophantine_data,
+        up_to_phase,
     }
 }
