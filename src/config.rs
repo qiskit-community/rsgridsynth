@@ -69,7 +69,13 @@ pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
 }
 
 /// Creates the default config to easily call the code from other rust packages.
-pub fn config_from_theta_epsilon(theta: f64, epsilon: f64, seed: u64) -> GridSynthConfig {
+/// `seed` is used to set single RNG that is used through the call to `gridsynth`.
+pub fn config_from_theta_epsilon(
+    theta: f64,
+    epsilon: f64,
+    seed: u64,
+    verbose: bool,
+) -> GridSynthConfig {
     let (theta_num, theta_den) = parse_decimal_with_exponent(&theta.to_string()).unwrap();
     let theta = ib_to_bf_prec(theta_num) / ib_to_bf_prec(theta_den);
     let (epsilon_num, epsilon_den) = parse_decimal_with_exponent(&epsilon.to_string()).unwrap();
@@ -81,7 +87,6 @@ pub fn config_from_theta_epsilon(theta: f64, epsilon: f64, seed: u64) -> GridSyn
     let epsilon = ib_to_bf_prec(epsilon_num) / ib_to_bf_prec(epsilon_den);
     let diophantine_timeout = 200u128;
     let factoring_timeout = 50u128;
-    let verbose = false;
     let time = false;
 
     let rng: StdRng = SeedableRng::seed_from_u64(seed);
