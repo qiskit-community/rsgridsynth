@@ -19,10 +19,10 @@ pub struct ZRootTwo {
     pub(crate) b: IBig,
 }
 
-// const ONE: ZRootTwo = ZRootTwo {
-//     a: IBig::ONE,
-//     b: IBig::ZERO,
-// };
+pub const ONE: ZRootTwo = ZRootTwo {
+    a: IBig::ONE,
+    b: IBig::ZERO,
+};
 
 pub const LAMBDA: ZRootTwo = ZRootTwo {
     a: IBig::from_parts_const(Sign::Positive, 2),

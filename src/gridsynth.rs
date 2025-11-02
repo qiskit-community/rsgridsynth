@@ -223,7 +223,11 @@ impl Region for UnitDisk {
     fn intersect(&self, u0: &DOmega, v: &DOmega) -> Option<(FBig<HalfEven>, FBig<HalfEven>)> {
         let a = v.conj() * v;
         let b = 2 * (v.conj() * u0);
-        let c = u0.conj() * u0 - IBig::ONE;
+        let shift_ = match self.phase {
+            PhaseMode::Exact => DOmega::from_zroottwo(&z_root_two::ONE),
+            PhaseMode::UpToPhase => DOmega::from_zroottwo(&z_root_two::LAMBDA_M),
+        };
+        let c = u0.conj() * u0 - shift_;
         solve_quadratic(a.real(), b.real(), c.real())
     }
 }
