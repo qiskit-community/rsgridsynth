@@ -66,11 +66,11 @@ impl EpsilonRegion {
         let four = fb_with_prec(FBig::try_from(4.0).unwrap());
         let epsilon_squared = fb_with_prec(&epsilon * &epsilon);
         let half_eps_sq = fb_with_prec(&epsilon_squared / &four);
-        let lambda_m_real = to_upright::LAMBDA_M.to_real();
+        let lambda_m_real: FBig<HalfEven> = fb_with_prec(to_upright::LAMBDA_M.to_real());
         let d = match scale {
             Scale::Exact => fb_with_prec(ctx.sqrt((one - half_eps_sq).repr()).value()),
             Scale::UpToPhase => fb_with_prec(
-                ctx.sqrt(((one - half_eps_sq) * sqrt_fbig(to_upright::LAMBDA_M.to_real())).repr())
+                ctx.sqrt(((one - half_eps_sq) * sqrt_fbig(&lambda_m_real.clone())).repr())
                     .value(),
             ),
         };
@@ -88,7 +88,7 @@ impl EpsilonRegion {
             Scale::Exact => fb_with_prec(epsilon.clone().powi(IBig::from(-4))),
             Scale::UpToPhase => {
                 fb_with_prec(epsilon.clone().powi(IBig::from(-4)))
-                    / fb_with_prec(to_upright::LAMBDA_M.to_real())
+                    / &lambda_m_real
             }
         };
 
@@ -96,7 +96,7 @@ impl EpsilonRegion {
             Scale::Exact => fb_with_prec(epsilon.clone().powi(IBig::from(-4))),
             Scale::UpToPhase => {
                 fb_with_prec(epsilon.clone().powi(IBig::from(-2)))
-                    / fb_with_prec(to_upright::LAMBDA_M.to_real())
+                    / &lambda_m_real
             }
         };
 

@@ -17,7 +17,7 @@ pub fn sqrt2() -> FBig<HalfEven> {
 }
 
 // This may be wasteful because of the allocation
-pub fn sqrt_fbig(x: FBig<HalfEven>) -> FBig<HalfEven> {
+pub fn sqrt_fbig(x: &FBig<HalfEven>) -> FBig<HalfEven> {
     let ctx: Context<mode::HalfEven> = Context::<mode::HalfEven>::new(get_prec_bits());
     let x = fb_with_prec(x.clone());
     let sx: FBig<HalfEven> = ctx.sqrt(x.repr()).value();
