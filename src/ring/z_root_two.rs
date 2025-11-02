@@ -23,6 +23,16 @@ const ONE: ZRootTwo = ZRootTwo {
     b: IBig::ZERO,
 };
 
+pub const LAMBDA: ZRootTwo = ZRootTwo {
+    a: IBig::ONE,
+    b: IBig::ONE,
+};
+
+pub const LAMBDA_M: ZRootTwo = ZRootTwo {
+    a: IBig::ONE,
+    b: IBig::NEG_ONE,
+};
+
 impl ZRootTwo {
     pub fn new(a: IBig, b: IBig) -> Self {
         Self { a, b }

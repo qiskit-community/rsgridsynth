@@ -20,7 +20,15 @@ pub struct DRootTwo {
 pub const ONE: DRootTwo = DRootTwo {
     alpha: ZRootTwo {
         a: IBig::ONE,
-        b: IBig::ONE,
+        b: IBig::ZERO,
+    },
+    k: 0,
+};
+
+pub const LAMBDA_M: DRootTwo = DRootTwo {
+    alpha: ZRootTwo {
+        a: IBig::ONE,
+        b: IBig::NEG_ONE,
     },
     k: 0,
 };
