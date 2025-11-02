@@ -14,7 +14,6 @@ fn simple_test() {
     assert_eq!(gates, expected_gates);
 }
 
-
 #[test]
 #[ignore]
 fn simple_test2() {
@@ -24,11 +23,7 @@ fn simple_test2() {
 
     let gates1 = "HTHTSHTSHTHTSHTHTSHTHTHTSHTSHTHTHTHTHTHTSHTSHTHTSHTSHTSHTSHTHTSHTSHTSHTHTHTHTHTHTSHTSHTHTSHTSHTSHTHTHTSHTSHTSHTSHTSHTSHTSHTHTHTHTHTSHTSHTSHTSHTSHTSHTHTHTHTHTSHTHTSHTHTHTSHTSHTSHTHTSHTSHTHTSHTHTSHTSHTHTSHTHTHTSHTSHTSHTSHTHTHTHTSHTHTHTSHTHTSHTHTHTSHTHTSHTHTSHTXSSWWW";
 
-    let test_inputs = vec![
-        (1234, gates1),
-        (101, gates1),
-        (1, gates1),
-    ];
+    let test_inputs = vec![(1234, gates1), (101, gates1), (1, gates1)];
 
     for (seed, expected_gates) in test_inputs {
         let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed);
@@ -36,7 +31,6 @@ fn simple_test2() {
         assert_eq!(gates, expected_gates, "Test failed for seed: {}", seed);
     }
 }
-
 
 //#[ignore]
 #[test]
