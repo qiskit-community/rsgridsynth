@@ -4,6 +4,7 @@
 use crate::common::ib_to_bf_prec;
 use crate::math::{floorsqrt, rounddiv, sign, sqrt2};
 use crate::ring::ZOmega;
+use dashu_base::Sign;
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::IBig;
@@ -24,7 +25,7 @@ const ONE: ZRootTwo = ZRootTwo {
 };
 
 pub const LAMBDA: ZRootTwo = ZRootTwo {
-    a: IBig::ONE,
+    a: IBig::from_parts_const(Sign::Positive, 2),
     b: IBig::ONE,
 };
 

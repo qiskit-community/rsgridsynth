@@ -69,11 +69,11 @@ impl EpsilonRegion {
         let four = fb_with_prec(FBig::try_from(4.0).unwrap());
         let epsilon_squared = fb_with_prec(&epsilon * &epsilon);
         let half_eps_sq = fb_with_prec(&epsilon_squared / &four);
-        let lambda_m_real: FBig<HalfEven> = fb_with_prec(z_root_two::LAMBDA_M.to_real());
+        let lambda_real: FBig<HalfEven> = fb_with_prec(z_root_two::LAMBDA.to_real());
         let d = match phase {
             PhaseMode::Exact => fb_with_prec(ctx.sqrt((one - half_eps_sq).repr()).value()),
             PhaseMode::UpToPhase => fb_with_prec(
-                ctx.sqrt(((one - half_eps_sq) * sqrt_fbig(&lambda_m_real.clone())).repr())
+                ctx.sqrt(((one - half_eps_sq) * sqrt_fbig(&lambda_real.clone())).repr())
                     .value(),
             ),
         };
@@ -90,14 +90,14 @@ impl EpsilonRegion {
         let epsilon_neg4: FBig<HalfEven> = match phase {
             PhaseMode::Exact => fb_with_prec(epsilon.clone().powi(IBig::from(-4))),
             PhaseMode::UpToPhase => {
-                fb_with_prec(epsilon.clone().powi(IBig::from(-4))) / &lambda_m_real
+                fb_with_prec(epsilon.clone().powi(IBig::from(-4))) / &lambda_real
             }
         };
 
         let epsilon_neg2: FBig<HalfEven> = match phase {
             PhaseMode::Exact => fb_with_prec(epsilon.clone().powi(IBig::from(-4))),
             PhaseMode::UpToPhase => {
-                fb_with_prec(epsilon.clone().powi(IBig::from(-2))) / &lambda_m_real
+                fb_with_prec(epsilon.clone().powi(IBig::from(-2))) / &lambda_real
             }
         };
 
@@ -137,17 +137,21 @@ impl Region for EpsilonRegion {
         let cos_term1 = fb_with_prec(&self.z_x * u.real());
         let cos_term2 = fb_with_prec(&self.z_y * u.imag());
         let cos_similarity = fb_with_prec(&cos_term1 + &cos_term2);
-        let scale_ = match self.phase {
+        let scale = match self.phase {
             PhaseMode::Exact => d_root_two::ONE,
-            PhaseMode::UpToPhase => d_root_two::LAMBDA_M,
+            PhaseMode::UpToPhase => d_root_two::LAMBDA,
         };
-        DRootTwo::from_domega(u.conj() * u) <= scale_ && cos_similarity >= self.d
+        DRootTwo::from_domega(u.conj() * u) <= scale && cos_similarity >= self.d
     }
 
     fn intersect(&self, u0: &DOmega, v: &DOmega) -> Option<(FBig<HalfEven>, FBig<HalfEven>)> {
         let a = v.conj() * v;
         let b = 2 * (v.conj() * u0);
-        let c = u0.conj() * u0 - DOmega::from_int(IBig::ONE);
+        let scale = match self.phase {
+            PhaseMode::Exact => DOmega::from_int(IBig::ONE),
+            PhaseMode::UpToPhase => DOmega::from_zroottwo(&z_root_two::LAMBDA),
+        };
+        let c = u0.conj() * u0 - scale;
         let vz_term1 = fb_with_prec(&self.z_x * v.real());
         let vz_term2 = fb_with_prec(&self.z_y * v.imag());
         let vz = fb_with_prec(&vz_term1 + &vz_term2);
@@ -175,11 +179,12 @@ impl Region for EpsilonRegion {
 
 #[derive(Debug)]
 pub struct UnitDisk {
+    phase: PhaseMode,
     ellipse: Ellipse,
 }
 
 impl UnitDisk {
-    pub fn new() -> Self {
+    pub fn new(phase: PhaseMode) -> Self {
         let ellipse = Ellipse::from(
             ib_to_bf_prec(IBig::ONE),
             ib_to_bf_prec(IBig::ZERO),
@@ -188,7 +193,7 @@ impl UnitDisk {
             ib_to_bf_prec(IBig::ZERO),
             ib_to_bf_prec(IBig::ZERO),
         );
-        Self { ellipse }
+        Self { phase, ellipse }
     }
 
     pub fn ellipse(&self) -> &Ellipse {
@@ -196,9 +201,10 @@ impl UnitDisk {
     }
 }
 
+// We might not want this
 impl Default for UnitDisk {
     fn default() -> Self {
-        Self::new()
+        Self::new(PhaseMode::Exact)
     }
 }
 
@@ -207,7 +213,11 @@ impl Region for UnitDisk {
         self.ellipse.clone()
     }
     fn inside(&self, u: &DOmega) -> bool {
-        DRootTwo::from_domega(u.conj() * u) <= DRootTwo::from_int(IBig::ONE)
+        let scale = match self.phase {
+            PhaseMode::Exact => d_root_two::ONE,
+            PhaseMode::UpToPhase => d_root_two::LAMBDA_M,
+        };
+        DRootTwo::from_domega(u.conj() * u) <= scale
     }
 
     fn intersect(&self, u0: &DOmega, v: &DOmega) -> Option<(FBig<HalfEven>, FBig<HalfEven>)> {
@@ -296,7 +306,7 @@ fn setup_regions_and_transform(
     ),
 ) {
     let epsilon_region = EpsilonRegion::new(theta, epsilon, PhaseMode::Exact);
-    let unit_disk = UnitDisk::new();
+    let unit_disk = UnitDisk::new(PhaseMode::Exact);
 
     let start_upright = if measure_time {
         Some(Instant::now())

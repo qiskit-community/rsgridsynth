@@ -1,6 +1,7 @@
 // Copyright (c) 2024-2025 Shun Yamamoto and Nobuyuki Yoshioka, and IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
+use dashu_base::Sign;
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::IBig;
@@ -25,9 +26,17 @@ pub const ONE: DRootTwo = DRootTwo {
     k: 0,
 };
 
+pub const LAMBDA: DRootTwo = DRootTwo {
+    alpha: ZRootTwo {
+        a: IBig::from_parts_const(Sign::Positive, 2),
+        b: IBig::NEG_ONE,
+    },
+    k: 0,
+};
+
 pub const LAMBDA_M: DRootTwo = DRootTwo {
     alpha: ZRootTwo {
-        a: IBig::ONE,
+        a: IBig::from_parts_const(Sign::Positive, 2),
         b: IBig::NEG_ONE,
     },
     k: 0,
