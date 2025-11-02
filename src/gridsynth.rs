@@ -7,6 +7,7 @@ use crate::diophantine::diophantine_dyadic;
 use crate::math::solve_quadratic;
 use crate::math::sqrt_fbig;
 use crate::region::Ellipse;
+use crate::ring::d_root_two;
 use crate::ring::{DOmega, DRootTwo};
 use crate::synthesis_of_clifford_t::decompose_domega_unitary;
 use crate::tdgp::solve_tdgp;
@@ -41,10 +42,12 @@ fn matrix_multiply_2x2(
     result
 }
 
+// When synthesizing up to a phase, the pair 2 ± √2 enter in some places as scale factors.
+// They are called LAMBDA and LAMBDA_M.
 #[derive(Debug)]
 pub enum Scale {
-    Exact,
-    UpToPhase,
+    Exact,     // no scaling
+    UpToPhase, // do scaling
 }
 
 #[derive(Debug)]
@@ -130,6 +133,10 @@ impl Region for EpsilonRegion {
         let cos_term1 = fb_with_prec(&self.z_x * u.real());
         let cos_term2 = fb_with_prec(&self.z_y * u.imag());
         let cos_similarity = fb_with_prec(&cos_term1 + &cos_term2);
+        let scale_ = match self.scale {
+            Scale::Exact => d_root_two::ONE,
+            Scale::UpToPhase => DRootTwo::from_int(IBig::ONE),
+        };
         DRootTwo::from_domega(u.conj() * u) <= DRootTwo::from_int(IBig::ONE)
             && cos_similarity >= self.d
     }

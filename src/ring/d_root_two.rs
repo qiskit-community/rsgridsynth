@@ -17,6 +17,14 @@ pub struct DRootTwo {
     pub(crate) k: i64,
 }
 
+pub const ONE: DRootTwo = DRootTwo {
+    alpha: ZRootTwo {
+        a: IBig::ONE,
+        b: IBig::ONE,
+    },
+    k: 0,
+};
+
 impl DRootTwo {
     pub fn new(alpha: ZRootTwo, k: i64) -> Self {
         Self { alpha, k }

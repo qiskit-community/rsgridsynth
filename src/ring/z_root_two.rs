@@ -18,6 +18,11 @@ pub struct ZRootTwo {
     pub(crate) b: IBig,
 }
 
+const ONE: ZRootTwo = ZRootTwo {
+    a: IBig::ONE,
+    b: IBig::ZERO,
+};
+
 impl ZRootTwo {
     pub fn new(a: IBig, b: IBig) -> Self {
         Self { a, b }
