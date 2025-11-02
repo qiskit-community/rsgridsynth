@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2025 Shun Yamamoto and Nobuyuki Yoshioka, and IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
-use crate::common::{get_prec_bits, ib_to_bf_prec};
+use crate::common::{fb_with_prec, get_prec_bits, ib_to_bf_prec};
 use dashu_float::round::mode;
 use dashu_float::Context;
 use dashu_float::{round::mode::HalfEven, FBig};
@@ -14,6 +14,14 @@ pub fn sqrt2() -> FBig<HalfEven> {
     let x = ib_to_bf_prec(IBig::from(2));
     let a: FBig<HalfEven> = ctx.sqrt(x.repr()).value();
     a
+}
+
+// This may be wasteful because of the allocation
+pub fn sqrt_fbig(x: &FBig<HalfEven>) -> FBig<HalfEven> {
+    let ctx: Context<mode::HalfEven> = Context::<mode::HalfEven>::new(get_prec_bits());
+    let x = fb_with_prec(x.clone());
+    let sx: FBig<HalfEven> = ctx.sqrt(x.repr()).value();
+    sx
 }
 
 pub fn ntz(n: &IBig) -> i64 {
