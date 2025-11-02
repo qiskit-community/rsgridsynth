@@ -17,6 +17,11 @@ const LAMBDA: ZRootTwo = ZRootTwo {
     b: IBig::ONE,
 };
 
+pub const LAMBDA_M: ZRootTwo = ZRootTwo {
+    a: IBig::ONE,
+    b: IBig::NEG_ONE,
+};
+
 fn reduction(
     ellipse_pair: EllipsePair,
     op_g_l: &GridOp,

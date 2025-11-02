@@ -5,11 +5,13 @@ use crate::common::{cos_fbig, fb_with_prec, get_prec_bits, ib_to_bf_prec, sin_fb
 use crate::config::GridSynthConfig;
 use crate::diophantine::diophantine_dyadic;
 use crate::math::solve_quadratic;
+use crate::math::sqrt_fbig;
 use crate::region::Ellipse;
 use crate::ring::{DOmega, DRootTwo};
 use crate::synthesis_of_clifford_t::decompose_domega_unitary;
 use crate::tdgp::solve_tdgp;
 use crate::tdgp::Region;
+use crate::to_upright;
 use crate::to_upright::to_upright_set_pair;
 use crate::unitary::DOmegaUnitary;
 use dashu_float::round::mode::{self, HalfEven};
@@ -64,23 +66,48 @@ impl EpsilonRegion {
         let four = fb_with_prec(FBig::try_from(4.0).unwrap());
         let epsilon_squared = fb_with_prec(&epsilon * &epsilon);
         let half_eps_sq = fb_with_prec(&epsilon_squared / &four);
-        let d = fb_with_prec(ctx.sqrt((one - half_eps_sq).repr()).value());
+        let lambda_m_real = to_upright::LAMBDA_M.to_real();
+        let d = match scale {
+            Scale::Exact => fb_with_prec(ctx.sqrt((one - half_eps_sq).repr()).value()),
+            Scale::UpToPhase => fb_with_prec(
+                ctx.sqrt(((one - half_eps_sq) * sqrt_fbig(to_upright::LAMBDA_M.to_real())).repr())
+                    .value(),
+            ),
+        };
+        //            fb_with_prec(ctx.sqrt((one - half_eps_sq).repr()).value());
         let theta_half = fb_with_prec(&theta / &two);
         let neg_theta_half = -fb_with_prec(theta_half);
         let z_x: FBig<HalfEven> = fb_with_prec(cos_fbig(&neg_theta_half));
         let z_y: FBig<HalfEven> = fb_with_prec(sin_fbig(&neg_theta_half));
         let neg_z_y: FBig<HalfEven> = -fb_with_prec(z_y.clone());
-        let zero: FBig<HalfEven> = ib_to_bf_prec(IBig::ZERO);
-        let epsilon_neg4: FBig<HalfEven> = fb_with_prec(epsilon.clone().powi(IBig::from(-4)));
-        let epsilon_neg2: FBig<HalfEven> = fb_with_prec(epsilon.clone().powi(IBig::from(-2)));
         let d1: Matrix2<FBig<HalfEven>> =
             Matrix2::new(z_x.clone(), neg_z_y.clone(), z_y.clone(), z_x.clone());
+
+        // The following two expressions divide the unscaled matrix by the scale factor
+        let epsilon_neg4: FBig<HalfEven> = match scale {
+            Scale::Exact => fb_with_prec(epsilon.clone().powi(IBig::from(-4))),
+            Scale::UpToPhase => {
+                fb_with_prec(epsilon.clone().powi(IBig::from(-4)))
+                    / fb_with_prec(to_upright::LAMBDA_M.to_real())
+            }
+        };
+
+        let epsilon_neg2: FBig<HalfEven> = match scale {
+            Scale::Exact => fb_with_prec(epsilon.clone().powi(IBig::from(-4))),
+            Scale::UpToPhase => {
+                fb_with_prec(epsilon.clone().powi(IBig::from(-2)))
+                    / fb_with_prec(to_upright::LAMBDA_M.to_real())
+            }
+        };
+
+        let zero: FBig<HalfEven> = ib_to_bf_prec(IBig::ZERO);
         let d2: Matrix2<FBig<HalfEven>> = Matrix2::new(
             64 * epsilon_neg4,
             zero.clone(),
             zero.clone(),
             4 * epsilon_neg2,
         );
+
         let d3: Matrix2<FBig<HalfEven>> =
             Matrix2::new(z_x.clone(), z_y.clone(), neg_z_y, z_x.clone());
         let px = fb_with_prec(&d * &z_x);
