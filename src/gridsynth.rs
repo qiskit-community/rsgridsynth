@@ -86,18 +86,12 @@ impl EpsilonRegion {
         // The following two expressions divide the unscaled matrix by the scale factor
         let epsilon_neg4: FBig<HalfEven> = match scale {
             Scale::Exact => fb_with_prec(epsilon.clone().powi(IBig::from(-4))),
-            Scale::UpToPhase => {
-                fb_with_prec(epsilon.clone().powi(IBig::from(-4)))
-                    / &lambda_m_real
-            }
+            Scale::UpToPhase => fb_with_prec(epsilon.clone().powi(IBig::from(-4))) / &lambda_m_real,
         };
 
         let epsilon_neg2: FBig<HalfEven> = match scale {
             Scale::Exact => fb_with_prec(epsilon.clone().powi(IBig::from(-4))),
-            Scale::UpToPhase => {
-                fb_with_prec(epsilon.clone().powi(IBig::from(-2)))
-                    / &lambda_m_real
-            }
+            Scale::UpToPhase => fb_with_prec(epsilon.clone().powi(IBig::from(-2))) / &lambda_m_real,
         };
 
         let zero: FBig<HalfEven> = ib_to_bf_prec(IBig::ZERO);
