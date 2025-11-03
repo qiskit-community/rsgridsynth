@@ -7,7 +7,7 @@ use dashu_int::IBig;
 
 use crate::common::{fb_with_prec, ib_to_bf_prec};
 use crate::grid_op::GridOp;
-use crate::odgp::{solve_scaled_odgp, solve_scaled_odgp_with_parity};
+use crate::odgp::{solve_scaled_odgp, solve_scaled_odgp_with_parity_k_ne_0};
 use crate::region::{Ellipse, Interval, Rectangle};
 use crate::ring::{DOmega, DRootTwo};
 
@@ -42,7 +42,7 @@ pub fn solve_tdgp(
 
     let alpha0 = match sol_x.next() {
         Some(val) => val,
-        None => return vec![]
+        None => return vec![],
     };
 
     let droot_zero = DRootTwo::from_int(IBig::ZERO);
@@ -99,10 +99,8 @@ pub fn solve_tdgp(
         int_a = int_a.fatten(&dt_a);
         int_b = int_b.fatten(&dt_b);
 
-        let sol_t = solve_scaled_odgp_with_parity(int_a, int_b, 1, &parity);
-        let sol_x = sol_t
-            .into_iter()
-            .map(|alpha| alpha * dx.clone() + alpha0.clone());
+        let sol_t = solve_scaled_odgp_with_parity_k_ne_0(int_a, int_b, 1, &parity);
+        let sol_x = sol_t.map(|alpha| alpha * dx.clone() + alpha0.clone());
         for alpha in sol_x {
             sol_sufficient.push(DOmega::from_droottwo_vector(&alpha, &beta, k));
         }

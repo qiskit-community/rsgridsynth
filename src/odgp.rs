@@ -133,7 +133,6 @@ pub fn solve_odgp_with_parity(
         .map(move |alpha| (alpha * ZRootTwo::new(IBig::ZERO, IBig::ONE)) + &p)
 }
 
-
 pub fn solve_scaled_odgp(i: Interval, j: Interval, k: i64) -> impl Iterator<Item = DRootTwo> {
     let scale = pow_sqrt2(k);
     let neg_scale = -scale.clone();
@@ -142,22 +141,22 @@ pub fn solve_scaled_odgp(i: Interval, j: Interval, k: i64) -> impl Iterator<Item
     } else {
         j.scale(&neg_scale)
     };
-    solve_odgp(i.scale(&scale), scaled_j)
-        .map(move |alpha| DRootTwo::new(alpha, k))
+    solve_odgp(i.scale(&scale), scaled_j).map(move |alpha| DRootTwo::new(alpha, k))
 }
 
-pub fn solve_scaled_odgp_with_parity(
+pub fn solve_scaled_odgp_with_parity_k_ne_0(
     i: Interval,
     j: Interval,
     k: i64,
     beta: &DRootTwo,
-) -> Vec<DRootTwo> {
-    if k == 0 {
-        let base = beta.renew_denomexp(0);
-        return solve_odgp_with_parity(i, j, &base)
-            .map(DRootTwo::from_zroottwo)
-            .collect();
-    }
+) -> impl Iterator<Item = DRootTwo> {
+    // Can't do this because the iterators are not of the same type.
+    // But this function is only called with k == 1. So we don't need the k == 0 branch.
+    // if k == 0 {
+    //     let base = beta.renew_denomexp(0);
+    //     return solve_odgp_with_parity(i, j, &base)
+    //          .map(DRootTwo::from_zroottwo);
+    //  }
 
     let p = beta.renew_denomexp(k).parity();
     let offset = if p == IBig::ZERO {
@@ -169,7 +168,7 @@ pub fn solve_scaled_odgp_with_parity(
     let sub_i = i - offset.to_real();
     let sub_j = j - offset.conj_sq2().to_real();
     let sol = solve_scaled_odgp(sub_i, sub_j, k - 1);
-    sol.into_iter().map(|a| a + offset.clone()).collect()
+    sol.map(move |a| a + offset.clone())
 }
 
 #[cfg(test)]
