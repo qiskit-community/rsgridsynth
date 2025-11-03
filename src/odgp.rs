@@ -113,7 +113,7 @@ fn solve_odgp_internal(i: &Interval, j: &Interval) -> Vec<ZRootTwo> {
     let scaled_j = j.scale(&lambda_conj_sq2_n_f);
     solve_odgp_internal(&scaled_i, &scaled_j)
         .into_iter()
-        .map(|beta| beta * lambda_inv_n.clone())
+        .map(|beta| &beta * &lambda_inv_n)
         .collect()
 }
 
