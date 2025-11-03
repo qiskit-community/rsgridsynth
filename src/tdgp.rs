@@ -28,10 +28,7 @@ pub fn solve_tdgp(
 ) -> Vec<DOmega> {
     let mut sol_sufficient = Vec::with_capacity(100); // Pre-allocate reasonable capacity
 
-    let sol_x = solve_scaled_odgp(bbox_a.x.clone(), bbox_b.x.clone(), k + 1);
-    if sol_x.is_empty() {
-        return vec![];
-    }
+    let mut sol_x = solve_scaled_odgp(bbox_a.x.clone(), bbox_b.x.clone(), k + 1);
 
     let sol_y = solve_scaled_odgp(
         bbox_a
@@ -43,11 +40,11 @@ pub fn solve_tdgp(
         k + 1,
     );
 
-    if sol_y.is_empty() {
-        return vec![];
-    }
+    let alpha0 = match sol_x.next() {
+        Some(val) => val,
+        None => return vec![]
+    };
 
-    let alpha0 = &sol_x[0];
     let droot_zero = DRootTwo::from_int(IBig::ZERO);
     let _k_ibig = IBig::from(k);
     let dx = DRootTwo::power_of_inv_sqrt2(k);
@@ -60,7 +57,7 @@ pub fn solve_tdgp(
     for beta in sol_y {
         let dx = DRootTwo::power_of_inv_sqrt2(k);
         let z0 = op_g.inv().as_ref().unwrap().clone()
-            * DOmega::from_droottwo_vector(alpha0, &beta, k + 1);
+            * DOmega::from_droottwo_vector(&alpha0, &beta, k + 1);
         let v = op_g.inv().as_ref().unwrap().clone()
             * DOmega::from_droottwo_vector(&dx, &droot_zero, k);
         let t_a = set_a.intersect(&z0, &v);
@@ -70,7 +67,7 @@ pub fn solve_tdgp(
         }
         let (t_a, t_b) = (t_a.unwrap(), t_b.unwrap());
 
-        let parity = (&beta - alpha0).mul_by_sqrt2_power_renewing_denomexp(k);
+        let parity = (&beta - &alpha0).mul_by_sqrt2_power_renewing_denomexp(k);
         let (mut int_a, mut int_b) = (Interval::new(t_a.0, t_a.1), Interval::new(t_b.0, t_b.1));
         let dt_a = {
             let ten = ib_to_bf_prec(IBig::from(10));

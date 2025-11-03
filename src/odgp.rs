@@ -133,7 +133,8 @@ pub fn solve_odgp_with_parity(
         .map(move |alpha| (alpha * ZRootTwo::new(IBig::ZERO, IBig::ONE)) + &p)
 }
 
-pub fn solve_scaled_odgp(i: Interval, j: Interval, k: i64) -> Vec<DRootTwo> {
+
+pub fn solve_scaled_odgp(i: Interval, j: Interval, k: i64) -> impl Iterator<Item = DRootTwo> {
     let scale = pow_sqrt2(k);
     let neg_scale = -scale.clone();
     let scaled_j = if k & 1 == 0 {
@@ -142,8 +143,7 @@ pub fn solve_scaled_odgp(i: Interval, j: Interval, k: i64) -> Vec<DRootTwo> {
         j.scale(&neg_scale)
     };
     solve_odgp(i.scale(&scale), scaled_j)
-        .map(|alpha| DRootTwo::new(alpha, k))
-        .collect()
+        .map(move |alpha| DRootTwo::new(alpha, k))
 }
 
 pub fn solve_scaled_odgp_with_parity(
@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn test_use_empty_interval() {
         let (inti, intj) = create_empty_interval();
-        let result = solve_scaled_odgp(inti, intj, 2);
-        assert!(result.is_empty());
+        let mut result = solve_scaled_odgp(inti, intj, 2);
+        assert!(result.next().is_none());
     }
 }
