@@ -15,3 +15,5 @@ pub mod synthesis_of_clifford_t;
 pub mod tdgp;
 pub mod to_upright;
 pub mod unitary;
+
+pub use diophantine::clear_caches;

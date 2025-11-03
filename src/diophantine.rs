@@ -838,6 +838,27 @@ fn diophantine(
 type DiophantineCacheType = LazyLock<Mutex<HashMap<(IBig, IBig), Option<DOmega>>>>;
 static DIOPHANTINE_CACHE: DiophantineCacheType = LazyLock::new(|| Mutex::new(HashMap::new()));
 
+pub fn clear_caches() {
+    if let Ok(mut cache) = PRIMALITY_CACHE.try_lock() {
+        cache.clear();
+    //        println!("cleared primality cache");
+    } else {
+        //        println!("Can't clear primality cache");
+    }
+    if let Ok(mut cache) = SQRT_CACHE.try_lock() {
+        cache.clear();
+        //        println!("cleared sqrt cache");
+    }
+    if let Ok(mut cache) = FACTOR_CACHE.try_lock() {
+        cache.clear();
+        //        println!("cleared factor cache");
+    }
+    if let Ok(mut cache) = DIOPHANTINE_CACHE.try_lock() {
+        cache.clear();
+        //        println!("cleared diophantine cache");
+    }
+}
+
 pub(crate) fn diophantine_dyadic(
     xi: DRootTwo,
     diophantine_data: &mut DiophantineData,
