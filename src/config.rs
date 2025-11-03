@@ -1,5 +1,5 @@
 use crate::common::ib_to_bf_prec;
-use crate::common::set_prec_bits;
+use crate::common::{reset_prec_bits, set_prec_bits};
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::{IBig, UBig};
@@ -77,6 +77,12 @@ pub fn config_from_theta_epsilon(
     verbose: bool,
 ) -> GridSynthConfig {
     let (theta_num, theta_den) = parse_decimal_with_exponent(&theta.to_string()).unwrap();
+
+    // The desired floating precision is initialized in module common.
+    // It has the initial value the first time this function is called.
+    // But, on subsequent calls, the precision has changed.
+    // We reset it so that the precison is the same at the beginning of every synthesis.
+    reset_prec_bits();
     let theta = ib_to_bf_prec(theta_num) / ib_to_bf_prec(theta_den);
     let (epsilon_num, epsilon_den) = parse_decimal_with_exponent(&epsilon.to_string()).unwrap();
     // The magic number 12 safely overapproximates the bits of precision.
