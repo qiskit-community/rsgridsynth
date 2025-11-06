@@ -28,17 +28,7 @@ pub fn solve_tdgp(
 ) -> Vec<DOmega> {
     let mut sol_sufficient = Vec::with_capacity(100); // Pre-allocate reasonable capacity
 
-    let mut sol_x = solve_scaled_odgp(bbox_a.x.clone(), bbox_b.x.clone(), k + 1);
-
-    let sol_y = solve_scaled_odgp(
-        bbox_a
-            .y
-            .fatten(&(bbox_a.y.width() / ib_to_bf_prec(IBig::from(10000)))),
-        bbox_b
-            .y
-            .fatten(&(bbox_b.y.width() / ib_to_bf_prec(IBig::from(10000)))),
-        k + 1,
-    );
+    let mut sol_x = solve_scaled_odgp(&bbox_a.x, &bbox_b.x, k + 1);
 
     let alpha0 = match sol_x.next() {
         Some(val) => val,
@@ -49,17 +39,26 @@ pub fn solve_tdgp(
     let _k_ibig = IBig::from(k);
     let dx = DRootTwo::power_of_inv_sqrt2(k);
     let op_g_inv_result = op_g.inv();
-    let op_g_inv = op_g_inv_result.as_ref().unwrap();
-    let zero_droottwo = DRootTwo::from_int(IBig::ZERO);
 
-    let v = op_g_inv.clone() * DOmega::from_droottwo_vector(&dx, &zero_droottwo, k);
+    let op_g_inv = op_g_inv_result.unwrap();
+    let zero_droottwo = DRootTwo::from_int(IBig::ZERO);
+    let v = op_g_inv * DOmega::from_droottwo_vector(&dx, &zero_droottwo, k);
+
     let v_conj_sq2 = v.conj_sq2();
+
+    let bbox_a_new = bbox_a
+        .y
+        .fatten(&(bbox_a.y.width() / ib_to_bf_prec(IBig::from(10000))));
+    let bbox_b_new = bbox_b
+        .y
+        .fatten(&(bbox_b.y.width() / ib_to_bf_prec(IBig::from(10000))));
+    let sol_y = solve_scaled_odgp(&bbox_a_new, &bbox_b_new, k + 1);
+
     for beta in sol_y {
         let dx = DRootTwo::power_of_inv_sqrt2(k);
-        let z0 = op_g.inv().as_ref().unwrap().clone()
-            * DOmega::from_droottwo_vector(&alpha0, &beta, k + 1);
-        let v = op_g.inv().as_ref().unwrap().clone()
-            * DOmega::from_droottwo_vector(&dx, &droot_zero, k);
+        let z0 = op_g.inv().unwrap() * DOmega::from_droottwo_vector(&alpha0, &beta, k + 1);
+        let v = op_g.inv().unwrap() * DOmega::from_droottwo_vector(&dx, &droot_zero, k);
+
         let t_a = set_a.intersect(&z0, &v);
         let t_b = set_b.intersect(z0.conj_sq2(), v_conj_sq2);
         if t_a.is_none() || t_b.is_none() {
@@ -71,29 +70,30 @@ pub fn solve_tdgp(
         let (mut int_a, mut int_b) = (Interval::new(t_a.0, t_a.1), Interval::new(t_b.0, t_b.1));
         let dt_a = {
             let ten = ib_to_bf_prec(IBig::from(10));
+
+            let shift_k = IBig::ONE << (k as usize);
+            let width_product = shift_k * int_b.width();
             let max_val = {
-                let shift_k = IBig::ONE << (k as usize);
-                let width_product = shift_k * int_b.width();
                 if ten > width_product {
-                    ten.clone()
+                    &ten
                 } else {
-                    width_product
+                    &width_product
                 }
             };
-            fb_with_prec(&ten / &max_val)
+            fb_with_prec(&ten / max_val)
         };
         let dt_b = {
             let ten = ib_to_bf_prec(IBig::from(10));
+            let shift_k = IBig::from(1) << (k as usize);
+            let width_product = shift_k * int_a.width();
             let max_val = {
-                let shift_k = IBig::from(1) << (k as usize);
-                let width_product = shift_k * int_a.width();
                 if ten > width_product {
-                    ten.clone()
+                    &ten
                 } else {
-                    width_product
+                    &width_product
                 }
             };
-            fb_with_prec(&ten / &max_val)
+            fb_with_prec(&ten / max_val)
         };
 
         int_a = int_a.fatten(&dt_a);
