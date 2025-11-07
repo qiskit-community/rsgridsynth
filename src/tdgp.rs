@@ -35,11 +35,7 @@ pub fn solve_tdgp<'a>(
     k: i64,
     _verbose: bool,
 ) -> Option<impl Iterator<Item = DOmega> + 'a> {
-    let alpha0 = match first_solve_scaled_odgp(&bbox_a.x, &bbox_b.x, k + 1) {
-        Some(val) => val,
-        None => return None,
-    };
-
+    let alpha0 = first_solve_scaled_odgp(&bbox_a.x, &bbox_b.x, k + 1)?;
     let _k_ibig = IBig::from(k);
     let dx = DRootTwo::power_of_inv_sqrt2(k);
     let op_g_inv_result = op_g.inv();
