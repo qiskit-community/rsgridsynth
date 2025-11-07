@@ -47,11 +47,7 @@ fn solve_odgp_internal(i: Interval, j: Interval) -> Box<dyn Iterator<Item = ZRoo
     if i.width() < ib_to_bf_prec(IBig::ZERO) || j.width() < ib_to_bf_prec(IBig::ZERO) {
         return Box::new(vec![].into_iter());
     } else if i.width() > ib_to_bf_prec(IBig::ZERO) && j.width() <= ib_to_bf_prec(IBig::ZERO) {
-        return Box::new(
-            solve_odgp_internal(j, i)
-                .into_iter()
-                .map(|beta| beta.conj_sq2()),
-        );
+        return Box::new(solve_odgp_internal(j, i).map(|beta| beta.conj_sq2()));
     }
 
     let n = if j.width() <= ib_to_bf_prec(IBig::ZERO) {
@@ -110,11 +106,7 @@ fn solve_odgp_internal(i: Interval, j: Interval) -> Box<dyn Iterator<Item = ZRoo
     let lambda_conj_sq2_n_f = lambda_conj_sq2_n.to_real();
     let scaled_i = i.scale(&lambda_n_f);
     let scaled_j = j.scale(&lambda_conj_sq2_n_f);
-    Box::new(
-        solve_odgp_internal(scaled_i, scaled_j)
-            .into_iter()
-            .map(move |beta| beta * lambda_inv_n.clone()),
-    )
+    Box::new(solve_odgp_internal(scaled_i, scaled_j).map(move |beta| beta * lambda_inv_n.clone()))
 }
 
 pub fn solve_odgp_with_parity(
