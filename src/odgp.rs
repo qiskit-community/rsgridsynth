@@ -133,6 +133,10 @@ pub fn solve_odgp_with_parity(
         .map(move |alpha| (alpha * ZRootTwo::new(IBig::ZERO, IBig::ONE)) + &p)
 }
 
+pub fn first_solve_scaled_odgp(i: &Interval, j: &Interval, k: i64) -> Option<DRootTwo> {
+    solve_scaled_odgp(i, j, k).next()
+}
+
 pub fn solve_scaled_odgp(i: &Interval, j: &Interval, k: i64) -> impl Iterator<Item = DRootTwo> {
     let scale = pow_sqrt2(k);
     let neg_scale = -scale.clone();
