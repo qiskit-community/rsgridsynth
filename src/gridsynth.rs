@@ -206,7 +206,7 @@ fn process_solution_candidate(mut z: DOmega, mut w_val: DOmega) -> DOmegaUnitary
 
 fn process_solutions<I>(
     config: &mut GridSynthConfig,
-    solutions: I, // Vec<DOmega>,
+    solutions: I,
     time_of_diophantine_dyadic: &mut Duration,
 ) -> Option<DOmegaUnitary>
 where
