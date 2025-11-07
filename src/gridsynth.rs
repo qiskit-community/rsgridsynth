@@ -15,7 +15,10 @@ use crate::unitary::DOmegaUnitary;
 use dashu_float::round::mode::{self, HalfEven};
 use dashu_float::{Context, FBig};
 use dashu_int::IBig;
-use log::{debug, info};
+
+//use log::{debug, info};
+use log::debug;
+
 use nalgebra::{Matrix2, Vector2};
 use std::cmp::Ordering;
 use std::time::{Duration, Instant};
@@ -201,11 +204,14 @@ fn process_solution_candidate(mut z: DOmega, mut w_val: DOmega) -> DOmegaUnitary
     }
 }
 
-fn process_solutions(
+fn process_solutions<I>(
     config: &mut GridSynthConfig,
-    solutions: Vec<DOmega>,
+    solutions: I, // Vec<DOmega>,
     time_of_diophantine_dyadic: &mut Duration,
-) -> Option<DOmegaUnitary> {
+) -> Option<DOmegaUnitary>
+where
+    I: Iterator<Item = DOmega>,
+{
     let start_diophantine = if config.measure_time {
         Some(Instant::now())
     } else {
@@ -313,14 +319,15 @@ fn search_for_solution(
             k,
             config.verbose,
         );
-        if config.verbose {
-            // Warning! Printing the length will materialize a potentially large iterator.
-            let lensol = match &solutions {
-                None => 0,
-                Some(sols) => sols.len(),
-            };
-            info!("k = {}, found {} candidates", k, lensol);
-        }
+        // TODO: Reenable
+        // if config.verbose {
+        //     // Warning! Printing the length will materialize a potentially large iterator.
+        //     let lensol = match &solutions {
+        //         None => 0,
+        //         Some(sols) => sols.len(),
+        //     };
+        //     info!("k = {}, found {} candidates", k, lensol);
+        // }
         if let Some(start) = start_tdgp {
             time_of_solve_tdgp += start.elapsed();
         }

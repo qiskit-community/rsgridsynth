@@ -26,15 +26,15 @@ pub trait Region {
     fn intersect(&self, u: &DOmega, v: &DOmega) -> Option<(FBig<HalfEven>, FBig<HalfEven>)>;
 }
 
-pub fn solve_tdgp(
-    set_a: &impl Region,
-    set_b: &impl Region,
-    op_g: &GridOp,
-    bbox_a: &Rectangle,
-    bbox_b: &Rectangle,
+pub fn solve_tdgp<'a>(
+    set_a: &'a impl Region,
+    set_b: &'a impl Region,
+    op_g: &'a GridOp,
+    bbox_a: &'a Rectangle,
+    bbox_b: &'a Rectangle,
     k: i64,
     _verbose: bool,
-) -> Option<Vec<DOmega>> {
+) -> Option<impl Iterator<Item = DOmega> + 'a> {
     let alpha0 = match first_solve_scaled_odgp(&bbox_a.x, &bbox_b.x, k + 1) {
         Some(val) => val,
         None => return None,
@@ -47,7 +47,7 @@ pub fn solve_tdgp(
     let op_g_inv = op_g_inv_result.unwrap();
     let zero_droottwo = DRootTwo::from_int(IBig::ZERO);
     let v = op_g_inv * DOmega::from_droottwo_vector(&dx, &zero_droottwo, k);
-    let v_conj_sq2 = v.conj_sq2();
+    let v_conj_sq2 = v.conj_sq2().clone();
 
     let bbox_a_new = bbox_a
         .y
@@ -57,17 +57,15 @@ pub fn solve_tdgp(
         .fatten(&(bbox_b.y.width() / ib_to_bf_prec(IBig::from(10000))));
     let sol_y = solve_scaled_odgp(&bbox_a_new, &bbox_b_new, k + 1);
 
-    let sol_sufficient = sol_y.flat_map(|y| {
-        newproc(y, set_a, set_b, op_g, &alpha0, v_conj_sq2, k)
+    let sol_sufficient = sol_y.flat_map(move |y| {
+        newproc(y, set_a, set_b, op_g, alpha0.clone(), v_conj_sq2.clone(), k)
             .into_iter()
             .flatten()
     });
 
     let solutions = sol_sufficient
         .map(|z| op_g.inv().unwrap() * z)
-        .filter(|z| set_a.inside(z) && set_b.inside(z.conj_sq2()))
-        .collect();
-
+        .filter(|z| set_a.inside(z) && set_b.inside(z.conj_sq2()));
     Some(solutions)
 }
 
@@ -76,23 +74,26 @@ fn newproc<'a>(
     set_a: &'a impl Region,
     set_b: &'a impl Region,
     op_g: &'a GridOp,
-    alpha0: &'a DRootTwo,
-    v_conj_sq2: &'a DOmega,
+    alpha0: DRootTwo,
+    //    alpha0: &'a DRootTwo,
+    v_conj_sq2: DOmega,
+    //    v_conj_sq2: &'a DOmega,
     k: i64,
 ) -> Option<impl Iterator<Item = DOmega> + 'a> {
+    let alpha0 = alpha0.clone();
     let droot_zero = DRootTwo::from_int(IBig::ZERO);
     let dx = DRootTwo::power_of_inv_sqrt2(k);
-    let z0 = op_g.inv().unwrap() * DOmega::from_droottwo_vector(alpha0, &beta, k + 1);
+    let z0 = op_g.inv().unwrap() * DOmega::from_droottwo_vector(&alpha0, &beta, k + 1);
     let v = op_g.inv().unwrap() * DOmega::from_droottwo_vector(&dx, &droot_zero, k);
 
     let t_a = set_a.intersect(&z0, &v);
-    let t_b = set_b.intersect(z0.conj_sq2(), v_conj_sq2);
+    let t_b = set_b.intersect(z0.conj_sq2(), &v_conj_sq2);
     if t_a.is_none() || t_b.is_none() {
         return None;
     }
     let (t_a, t_b) = (t_a.unwrap(), t_b.unwrap());
 
-    let parity = (&beta - alpha0).mul_by_sqrt2_power_renewing_denomexp(k);
+    let parity = (&beta - &alpha0).mul_by_sqrt2_power_renewing_denomexp(k);
     let (mut int_a, mut int_b) = (Interval::new(t_a.0, t_a.1), Interval::new(t_b.0, t_b.1));
     let dt_a = get_dt_x(k, &int_b);
     let dt_b = get_dt_x(k, &int_a);
