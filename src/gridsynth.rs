@@ -117,6 +117,7 @@ impl Region for EpsilonRegion {
         let term2 = fb_with_prec(&self.z_y * u0.imag());
         let temp_sub = fb_with_prec(&self.d - &term1);
         let rhs = fb_with_prec(&temp_sub - &term2);
+        // t0 <= t1
         let (t0, t1) = solve_quadratic(a.real(), b.real(), c.real())?;
         let zero = fb_with_prec(ib_to_bf_prec(IBig::ZERO));
 
@@ -303,7 +304,7 @@ fn search_for_solution(
         } else {
             None
         };
-        let solution = solve_tdgp(
+        let solutions = solve_tdgp(
             epsilon_region,
             unit_disk,
             &transformed.0,
@@ -313,22 +314,29 @@ fn search_for_solution(
             config.verbose,
         );
         if config.verbose {
-            info!("k = {}, found {} candidates", k, solution.len());
+            // Warning! Printing the length will materialize a potentially large iterator.
+            let lensol = match &solutions {
+                None => 0,
+                Some(sols) => sols.len(),
+            };
+            info!("k = {}, found {} candidates", k, lensol);
         }
         if let Some(start) = start_tdgp {
             time_of_solve_tdgp += start.elapsed();
         }
-
-        if let Some(result) = process_solutions(config, solution, &mut time_of_diophantine_dyadic) {
-            if config.measure_time {
-                debug!(
-                    "time of solve_TDGP: {:.3} ms",
-                    time_of_solve_tdgp.as_secs_f64() * 1000.0
-                );
+        if let Some(solutions) = solutions {
+            if let Some(result) =
+                process_solutions(config, solutions, &mut time_of_diophantine_dyadic)
+            {
+                if config.measure_time {
+                    debug!(
+                        "time of solve_TDGP: {:.3} ms",
+                        time_of_solve_tdgp.as_secs_f64() * 1000.0
+                    );
+                }
+                return result;
             }
-            return result;
         }
-
         k += 1;
     }
 }
