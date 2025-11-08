@@ -4,16 +4,12 @@
 use crate::common::ib_to_bf_prec;
 use crate::math::{floorlog, pow_sqrt2, sqrt2};
 use crate::region::Interval;
+use crate::ring::z_root_two::LAMBDA;
 use crate::ring::{DRootTwo, ZRootTwo};
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::IBig;
 use std::iter;
-
-const LAMBDA: ZRootTwo = ZRootTwo {
-    a: IBig::ONE,
-    b: IBig::ONE,
-};
 
 pub fn solve_odgp(i: Interval, j: Interval) -> impl Iterator<Item = ZRootTwo> {
     // Can't return two different iterator types. So we can't do this check.
