@@ -14,7 +14,7 @@ fn reduce_denomexp(mut unitary: DOmegaUnitary) -> (String, DOmegaUnitary) {
     let t_power_and_h = ["H", "TH", "SH", "TSH"];
     let residue_z = unitary.z.residue();
     let residue_w = unitary.w.residue();
-    let residue_squared_z = (unitary.z.u.clone() * unitary.z.conj().u.clone()).residue();
+    let residue_squared_z = (&unitary.z.u * &unitary.z.conj().u).residue();
 
     let mut m = BIT_SHIFT[residue_w as usize] - BIT_SHIFT[residue_z as usize];
     if m < 0 {
