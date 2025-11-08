@@ -8,6 +8,7 @@ use crate::ring::{DRootTwo, ZRootTwo};
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::IBig;
+use std::iter;
 
 const LAMBDA: ZRootTwo = ZRootTwo {
     a: IBig::ONE,
@@ -32,7 +33,7 @@ pub fn solve_odgp(i: Interval, j: Interval) -> impl Iterator<Item = ZRootTwo> {
     let alpha = ZRootTwo::new(a, b);
     let sub_i = i.sub_ref(&alpha.to_real());
     let sub_j = j.sub_ref(&alpha.conj_sq2().to_real());
-    let sol = solve_odgp_internal(&sub_i, &sub_j);
+    let sol = solve_odgp_internal(sub_i, sub_j);
     sol.into_iter()
         .map(move |beta| &beta + &alpha)
         .filter(move |beta| {
@@ -42,15 +43,11 @@ pub fn solve_odgp(i: Interval, j: Interval) -> impl Iterator<Item = ZRootTwo> {
         })
 }
 
-//
-fn solve_odgp_internal(i: &Interval, j: &Interval) -> Vec<ZRootTwo> {
+fn solve_odgp_internal(i: Interval, j: Interval) -> Box<dyn Iterator<Item = ZRootTwo>> {
     if i.width() < ib_to_bf_prec(IBig::ZERO) || j.width() < ib_to_bf_prec(IBig::ZERO) {
-        return vec![];
+        return Box::new(vec![].into_iter());
     } else if i.width() > ib_to_bf_prec(IBig::ZERO) && j.width() <= ib_to_bf_prec(IBig::ZERO) {
-        return solve_odgp_internal(j, i)
-            .into_iter()
-            .map(|beta| beta.conj_sq2())
-            .collect();
+        return Box::new(solve_odgp_internal(j, i).map(|beta| beta.conj_sq2()));
     }
 
     let n = if j.width() <= ib_to_bf_prec(IBig::ZERO) {
@@ -68,38 +65,36 @@ fn solve_odgp_internal(i: &Interval, j: &Interval) -> Vec<ZRootTwo> {
         let div_max: FBig<HalfEven> = sum_max / 2;
         let a_max = div_max.floor().try_into().unwrap();
 
-        let mut sol = vec![];
-        let mut a = a_min.clone();
-        loop {
-            if a > a_max {
-                break;
+        let sol_iter = iter::successors(Some(a_min.clone()), move |a| {
+            let mut a_next = a.clone();
+            a_next += 1;
+            if a_next <= a_max {
+                Some(a_next)
+            } else {
+                None
             }
-
+        })
+        .flat_map(move |a| {
             let a_real = ib_to_bf_prec(a.clone()); // 明示的に clone して消費
             let tmp1: FBig<HalfEven> = sqrt2() * (&a_real - &j.r) / 2;
             let b_min: IBig = tmp1.ceil().try_into().unwrap();
 
             let tmp2: FBig<HalfEven> = sqrt2() * (&a_real - &j.l) / 2;
             let b_max: IBig = tmp2.floor().try_into().unwrap();
-            if b_max >= b_min {
-                let range_size = b_max.clone() - &b_min + 1;
-                if let Ok(size_hint) = usize::try_from(&range_size) {
-                    if size_hint <= 100 {
-                        sol.reserve(size_hint);
-                    }
+
+            iter::successors(Some(b_min.clone()), move |b| {
+                let mut b_next = b.clone();
+                b_next += 1;
+                if b_next <= b_max {
+                    Some(b_next)
+                } else {
+                    None
                 }
-            }
+            })
+            .map(move |b| ZRootTwo::new(a.clone(), b.clone()))
+        });
 
-            let mut b = b_min;
-            while b <= b_max {
-                sol.push(ZRootTwo::new(a.clone(), b.clone()));
-                b += 1;
-            }
-
-            a += 1;
-        }
-
-        return sol;
+        return Box::new(sol_iter);
     }
 
     let lambda_n = LAMBDA.pow(&n);
@@ -111,10 +106,7 @@ fn solve_odgp_internal(i: &Interval, j: &Interval) -> Vec<ZRootTwo> {
     let lambda_conj_sq2_n_f = lambda_conj_sq2_n.to_real();
     let scaled_i = i.scale(&lambda_n_f);
     let scaled_j = j.scale(&lambda_conj_sq2_n_f);
-    solve_odgp_internal(&scaled_i, &scaled_j)
-        .into_iter()
-        .map(|beta| &beta * &lambda_inv_n)
-        .collect()
+    Box::new(solve_odgp_internal(scaled_i, scaled_j).map(move |beta| beta * lambda_inv_n.clone()))
 }
 
 pub fn solve_odgp_with_parity(
