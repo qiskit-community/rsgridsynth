@@ -18,6 +18,15 @@ pub struct ZRootTwo {
     pub(crate) b: IBig,
 }
 
+// See Definition 3.5 on pg 3 of R+S for the definition of lambda (and delta)
+// Careful! There is a different, unrelated defintion of lambda in
+// the discussion in Definition 9.1 on page 19 of R+S. It is in fact
+// the fixed phase factor used in the up-to-phase algorithm.
+pub const LAMBDA: ZRootTwo = ZRootTwo {
+    a: IBig::ONE,
+    b: IBig::ONE,
+};
+
 impl ZRootTwo {
     pub fn new(a: IBig, b: IBig) -> Self {
         Self { a, b }

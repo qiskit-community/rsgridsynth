@@ -4,7 +4,7 @@
 mod d_omega;
 mod d_root_two;
 mod z_omega;
-mod z_root_two;
+pub mod z_root_two;
 
 pub use d_omega::DOmega;
 pub use d_root_two::DRootTwo;
