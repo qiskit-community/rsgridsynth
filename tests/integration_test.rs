@@ -1,3 +1,4 @@
+use ntest::timeout;
 use rsgridsynth::clear_caches;
 use rsgridsynth::config::config_from_theta_epsilon;
 use rsgridsynth::gridsynth::gridsynth_gates;
@@ -46,4 +47,20 @@ fn pi_over_two_test() {
             assert_eq!(gates, expected_gates);
         }
     }
+}
+
+#[timeout(1000)]
+#[test]
+#[should_panic(expected = "timeout")]
+#[serial]
+fn slowness_from_allocation_test() {
+    let pi = std::f64::consts::PI;
+    let theta = pi / 4.0;
+    let epsilon = 1e-10;
+    let seed = 1234;
+    let verbose = false;
+    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed, verbose);
+    let gates = gridsynth_gates(&mut gridsynth_config);
+    let expected_gates = "SHTHTSHTSHTHTSHTHTSHTSHTSHTSHTSHTHTHTHTSHTHTSHTHTHTHTSHTSHTHTSHTSHTHTSHTSHTSHTSHTSHTSHTSHTSHTHTSHTHTSHTSHTHTHTHTHTHTHTSHTSHTSHTSHTHTHTHTHTHTHTHTSHTSHTSHTHTSHTHTSHTHTHTHTSHTHTHTSHTHTHTHTHTSHTSHTHTSHTSHTSHTSHTSHTHTSHTHTSHTSHTHTSHTHTSHTHTSHTSHTSHTSHTHTSHTHTSHTSHTHTHTSHTHTSHTHTSHTHTHTSHTHTHTHTHTSHTHTHTHTSHTSHTSHTSHTHTSHTSHTHTHTHTSHTHTHTHTHTHTHXSWWW";
+    assert_eq!(gates, expected_gates);
 }

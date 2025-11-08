@@ -10,7 +10,7 @@ homepage = "https://github.com/qiskit-community/rsgridsynth"
 readme = "README.md"
 keywords = ["quantum", "benchmarking"]
 categories = ["algorithms", "science"]
-rust-version = "1.80"
+rust-version = "1.82"
 
 [[bin]]
 name = "rsgridsynth"
@@ -35,6 +35,7 @@ env_logger = "0.11"
 
 [dev-dependencies]
 serial_test = "*"
+ntest = "*"
 
 [profile.release]
 opt-level = 3
