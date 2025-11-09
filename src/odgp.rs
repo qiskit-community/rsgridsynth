@@ -40,13 +40,14 @@ pub fn solve_odgp(i: Interval, j: Interval) -> impl Iterator<Item = ZRootTwo> {
 }
 
 fn solve_odgp_internal(i: Interval, j: Interval) -> Box<dyn Iterator<Item = ZRootTwo>> {
-    if i.width() < ib_to_bf_prec(IBig::ZERO) || j.width() < ib_to_bf_prec(IBig::ZERO) {
+    let bfzero = ib_to_bf_prec(IBig::ZERO);
+    if i.width() < bfzero || j.width() < bfzero {
         return Box::new(vec![].into_iter());
-    } else if i.width() > ib_to_bf_prec(IBig::ZERO) && j.width() <= ib_to_bf_prec(IBig::ZERO) {
+    } else if i.width() > bfzero && j.width() <= bfzero {
         return Box::new(solve_odgp_internal(j, i).map(|beta| beta.conj_sq2()));
     }
 
-    let n = if j.width() <= ib_to_bf_prec(IBig::ZERO) {
+    let n = if j.width() <= bfzero {
         IBig::ZERO
     } else {
         floorlog(j.width(), LAMBDA.to_real()).0

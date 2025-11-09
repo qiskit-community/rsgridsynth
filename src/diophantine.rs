@@ -488,7 +488,7 @@ where
                     ZOmega::from_int(p.clone()),
                 );
                 let t_conj = t.conj();
-                if t_conj.clone() * t.clone() == p.clone() || t_conj * &t == -p.clone() {
+                if t_conj * &t == p || t_conj * &t == -p {
                     return Ok(Some(t));
                 }
             }
@@ -500,7 +500,7 @@ where
                     ZOmega::from_int(p.clone()),
                 );
                 let t_conj = t.conj();
-                if t_conj.clone() * t.clone() == p.clone() || t_conj * &t == -p.clone() {
+                if t_conj * &t == p || t_conj * &t == -p {
                     return Ok(Some(t));
                 }
             }
@@ -573,7 +573,7 @@ fn adj_decompose_int(
                 }
             }
             Ok(Some(t_p)) => {
-                t = t * t_p;
+                t = &t * &t_p;
             }
             Err(e) => {
                 return Err(e);
@@ -592,7 +592,7 @@ fn adj_decompose_selfassociate(
         return Ok(Some(ZOmega::from_int(IBig::ZERO)));
     }
     let n: IBig = (&xi.a).gcd(&xi.b).into();
-    let r = xi / n.clone();
+    let r = &xi / n.clone();
     let t1 = adj_decompose_int(n, start_time, diophantine_data);
     let t2 = if r % ZRootTwo::new(IBig::ZERO, IBig::ONE) == ZRootTwo::from_int(IBig::ZERO) {
         ZOmega::new(IBig::ZERO, IBig::ZERO, IBig::ONE, IBig::ONE)
@@ -600,7 +600,7 @@ fn adj_decompose_selfassociate(
         ZOmega::from_int(IBig::ONE)
     };
     match t1 {
-        Ok(Some(t1_val)) => Ok(Some(t1_val * t2)),
+        Ok(Some(t1_val)) => Ok(Some(&t1_val * &t2)),
         Ok(None) => Ok(None),
         Err(e) => Err(e),
     }
@@ -627,7 +627,7 @@ pub fn decompose_relatively_zomega_prime(
             }
             let (a, k_a) = &facs[i];
             if ZRootTwo::sim(a.clone(), b.clone()) {
-                u = u * (b.clone() / a.clone()).pow(&IBig::from(k_b));
+                u = u * (&b / a).pow(&IBig::from(k_b));
                 facs[i] = (a.clone(), k_a + k_b);
                 break;
             } else {
@@ -636,12 +636,12 @@ pub fn decompose_relatively_zomega_prime(
                     i += 1;
                     continue;
                 } else {
-                    let partial = vec![(a.clone() / g.clone(), *k_a), (g.clone(), k_a + k_b)];
+                    let partial = vec![(a / &g, *k_a), (g.clone(), k_a + k_b)];
                     let (u_a, mut facs_a) = decompose_relatively_zomega_prime(partial);
                     u = u * u_a;
                     facs[i] = facs_a.remove(0);
                     facs.append(&mut facs_a);
-                    stack.push((b / g, k_b));
+                    stack.push((&b / &g, k_b));
                     break;
                 }
             }
@@ -762,7 +762,7 @@ pub fn adj_decompose_selfcoprime(
                 {
                     //  &mut diophantine_data.rng) {
                     let fac = ZRootTwo::gcd(xi.clone(), ZRootTwo::from_int(fac_n));
-                    facs.push((eta / fac.clone(), k));
+                    facs.push((&eta / &fac, k));
                     facs.push((fac, k));
                     let (_, new_facs) = decompose_relatively_zomega_prime(facs);
                     facs = new_facs;
@@ -771,7 +771,7 @@ pub fn adj_decompose_selfcoprime(
                 }
             }
             Ok(Some(t_eta)) => {
-                t = t * t_eta;
+                t = &t * &t_eta;
             }
             Err(e) => {
                 return Err(e);
@@ -790,13 +790,13 @@ fn adj_decompose(
         return Ok(Some(ZOmega::from_int(IBig::ZERO)));
     }
     let d = ZRootTwo::gcd(xi.clone(), xi.conj_sq2());
-    let eta = xi / d.clone();
+    let eta = &xi / &d;
     let t1 = adj_decompose_selfassociate(d, start_time, diophantine_data);
     match t1 {
         Ok(Some(t1_val)) => {
             let t2 = adj_decompose_selfcoprime(eta, start_time, diophantine_data);
             match t2 {
-                Ok(Some(t2_val)) => Ok(Some(t1_val * t2_val)),
+                Ok(Some(t2_val)) => Ok(Some(&t1_val * &t2_val)),
                 Ok(None) => Ok(None),
                 Err(e) => Err(e),
             }
@@ -821,9 +821,9 @@ fn diophantine(
     match t {
         Ok(Some(t)) => {
             let xi_associate = ZRootTwo::from_zomega(t.conj() * &t);
-            let u = xi.clone() / xi_associate;
+            let u = xi / &xi_associate;
             match u.sqrt() {
-                Some(v) => Ok(Some(ZOmega::from_zroottwo(&v) * t)),
+                Some(v) => Ok(Some(&ZOmega::from_zroottwo(&v) * &t)),
                 None => {
                     warn!("Cannot find square root of u");
                     Ok(None)
@@ -903,7 +903,7 @@ pub(crate) fn diophantine_dyadic(
         Ok(None) => None,
         Ok(Some(mut t)) => {
             if k_mod_2 == 1 {
-                t = t * ZOmega::new(IBig::ZERO, IBig::NEG_ONE, IBig::ONE, IBig::ZERO);
+                t = &t * &ZOmega::new(IBig::ZERO, IBig::NEG_ONE, IBig::ONE, IBig::ZERO);
             }
             Some(DOmega::new(t, k_div_2 + k_mod_2))
         }

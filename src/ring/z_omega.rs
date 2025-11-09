@@ -43,17 +43,15 @@ impl ZOmega {
         }
     }
 
-    pub fn coef(&self) -> [IBig; 4] {
-        self.coef
-            .get_or_init(|| {
-                [
-                    self.d.clone(),
-                    self.c.clone(),
-                    self.b.clone(),
-                    self.a.clone(),
-                ]
-            })
-            .clone()
+    pub fn coef(&self) -> &[IBig; 4] {
+        self.coef.get_or_init(|| {
+            [
+                self.d.clone(),
+                self.c.clone(),
+                self.b.clone(),
+                self.a.clone(),
+            ]
+        })
     }
 
     pub fn conj(&self) -> &Self {
@@ -93,8 +91,9 @@ impl ZOmega {
 
     pub fn norm(&self) -> &IBig {
         self.norm_cache.get_or_init(|| {
-            let s1 = &self.a * &self.a + &self.b * &self.b + &self.c * &self.c + &self.d * &self.d;
-            let s2 = &self.a * &self.b + &self.b * &self.c + &self.c * &self.d - &self.d * &self.a;
+            let (a, b, c, d) = (&self.a, &self.b, &self.c, &self.d);
+            let s1 = a * a + b * b + c * c + d * d;
+            let s2 = a * b + b * c + c * d - d * a;
             &s1 * &s1 - 2 * &s2 * &s2
         })
     }
@@ -155,7 +154,7 @@ impl ZOmega {
     pub fn divmod(&self, other: &Self) -> (Self, Self) {
         let p0 = self * other.conj();
         let p1 = other.conj().conj_sq2() * other.conj_sq2();
-        let p = p0 * p1;
+        let p = &p0 * &p1;
         let k = other.norm();
         let q = ZOmega::new(
             rounddiv(&p.a, k),
@@ -163,7 +162,7 @@ impl ZOmega {
             rounddiv(&p.c, k),
             rounddiv(&p.d, k),
         );
-        let r = self.clone() - other.clone() * q.clone();
+        let r = self - &(other * &q);
         (q, r)
     }
 
@@ -218,43 +217,48 @@ impl ZOmega {
     }
 }
 
-impl Add for ZOmega {
-    type Output = Self;
-    fn add(self, rhs: Self) -> Self {
-        Self::new(
-            self.a + rhs.a,
-            self.b + rhs.b,
-            self.c + rhs.c,
-            self.d + rhs.d,
+// impl Add for ZOmega {
+//     type Output = Self;
+//     fn add(self, rhs: Self) -> Self {
+//         Self::new(
+//             self.a + rhs.a,
+//             self.b + rhs.b,
+//             self.c + rhs.c,
+//             self.d + rhs.d,
+//         )
+//     }
+// }
+
+impl Add for &ZOmega {
+    type Output = ZOmega;
+    fn add(self, rhs: Self) -> ZOmega {
+        ZOmega::new(
+            &self.a + &rhs.a,
+            &self.b + &rhs.b,
+            &self.c + &rhs.c,
+            &self.d + &rhs.d,
         )
     }
 }
 
-impl Add<IBig> for ZOmega {
-    type Output = Self;
-    fn add(self, rhs: IBig) -> Self {
-        self + Self::from_int(rhs)
-    }
-}
+// impl Add<&ZOmega> for &IBig {
+//     type Output = ZOmega;
+//     fn add(self, rhs: &ZOmega) -> ZOmega {
+//         &ZOmega::from_int(self) + &rhs
+//     }
+// }
 
 impl Add<ZOmega> for IBig {
     type Output = ZOmega;
     fn add(self, rhs: ZOmega) -> ZOmega {
-        ZOmega::from_int(self) + rhs
+        &ZOmega::from_int(self) + &rhs
     }
 }
 
-impl Sub for ZOmega {
-    type Output = Self;
-    fn sub(self, rhs: Self) -> Self {
-        self + (-rhs)
-    }
-}
-
-impl<'b> Sub<&'b ZOmega> for &ZOmega {
+impl Sub<&ZOmega> for &ZOmega {
     type Output = ZOmega;
 
-    fn sub(self, rhs: &'b ZOmega) -> ZOmega {
+    fn sub(self, rhs: &ZOmega) -> ZOmega {
         ZOmega::new(
             &self.a - &rhs.a,
             &self.b - &rhs.b,
@@ -264,19 +268,21 @@ impl<'b> Sub<&'b ZOmega> for &ZOmega {
     }
 }
 
-impl Sub<IBig> for ZOmega {
-    type Output = Self;
-    fn sub(self, rhs: IBig) -> Self {
-        self - Self::from_int(rhs)
-    }
-}
+// Never used apparently
+// impl Sub<IBig> for ZOmega {
+//     type Output = Self;
+//     fn sub(self, rhs: IBig) -> Self {
+//         self - Self::from_int(rhs)
+//     }
+// }
 
-impl Sub<ZOmega> for IBig {
-    type Output = ZOmega;
-    fn sub(self, rhs: ZOmega) -> ZOmega {
-        ZOmega::from_int(self) - rhs
-    }
-}
+// Never used apparently
+// impl Sub<&ZOmega> for IBig {
+//     type Output = ZOmega;
+//     fn sub(self, rhs: &ZOmega) -> ZOmega {
+//         &ZOmega::from_int(self) - rhs
+//     }
+// }
 
 impl Neg for ZOmega {
     type Output = Self;
@@ -285,10 +291,10 @@ impl Neg for ZOmega {
     }
 }
 
-impl Mul for ZOmega {
-    type Output = Self;
+impl Mul<&ZOmega> for &ZOmega {
+    type Output = ZOmega;
 
-    fn mul(self, rhs: Self) -> Self {
+    fn mul(self, rhs: &ZOmega) -> ZOmega {
         let lhs_coef = self.coef();
         let rhs_coef = rhs.coef();
 
@@ -305,20 +311,12 @@ impl Mul for ZOmega {
             }
         }
 
-        Self::new(
+        ZOmega::new(
             std::mem::take(&mut new_coef[3]),
             std::mem::take(&mut new_coef[2]),
             std::mem::take(&mut new_coef[1]),
             std::mem::take(&mut new_coef[0]),
         )
-    }
-}
-
-impl Mul<&ZOmega> for &ZOmega {
-    type Output = ZOmega;
-
-    fn mul(self, rhs: &ZOmega) -> ZOmega {
-        self.clone() * rhs.clone()
     }
 }
 
