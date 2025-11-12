@@ -138,6 +138,17 @@ fn compute_logarithm(
     (n, r)
 }
 
+/// Solves the quadratic equation ax^2 + bx + c = 0 for real roots.
+///
+/// # Arguments
+///
+/// - `a`: Coefficient of x^2, assumed to be non-zero for a valid quadratic equation.
+/// - `b`: Coefficient of x.
+/// - `c`: Constant term.
+///
+/// # Returns
+///
+/// An `Option` containing a tuple of two roots if they exist; otherwise, `None` if the roots are not real (i.e., the discriminant is negative).
 pub fn solve_quadratic(
     a: &FBig<HalfEven>,
     b: &FBig<HalfEven>,

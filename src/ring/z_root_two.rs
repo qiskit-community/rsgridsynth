@@ -35,7 +35,7 @@ pub const DELTA_SQUARED_M: ZRootTwo = ZRootTwo {
     b: IBig::NEG_ONE,
 };
 
-// See Definition 3.5 on pg 3 of R+S
+// See Definition 3.5 on pg 3 of R+S for the definition of lambda (and delta)
 // Careful! There is a different, unrelated defintion of lambda in
 // the discussion in Definition 9.1 on page 19 of R+S. It is in fact
 // the fixed phase factor used in the up-to-phase algorithm.
@@ -145,11 +145,11 @@ impl ZRootTwo {
         while b != ZRootTwo::from_int(IBig::ZERO) {
             let (q, r) = divmod(&a, &b);
             let tmp_y = y.clone();
-            y = x - &y * &q;
+            y = &x - &y * &q;
             x = tmp_y;
 
             let tmp_w = w.clone();
-            w = z - &w * &q;
+            w = &z - &w * &q;
             z = tmp_w;
 
             a = b;
@@ -233,16 +233,23 @@ impl AddAssign<&ZRootTwo> for ZRootTwo {
     }
 }
 
-impl Sub for ZRootTwo {
-    type Output = Self;
-    fn sub(self, other: Self) -> Self {
-        self + (-other)
+// impl Sub for ZRootTwo {
+//     type Output = Self;
+//     fn sub(self, other: Self) -> Self {
+//         self + (-other)
+//     }
+// }
+
+impl Sub<ZRootTwo> for &ZRootTwo {
+    type Output = ZRootTwo;
+    fn sub(self, other: ZRootTwo) -> ZRootTwo {
+        self + &(-other)
     }
 }
 
-impl Sub<IBig> for ZRootTwo {
-    type Output = Self;
-    fn sub(self, other: IBig) -> Self {
+impl Sub<IBig> for &ZRootTwo {
+    type Output = ZRootTwo;
+    fn sub(self, other: IBig) -> ZRootTwo {
         self - ZRootTwo::from_int(other)
     }
 }
@@ -280,18 +287,18 @@ impl Rem for ZRootTwo {
     }
 }
 
-impl Div for ZRootTwo {
-    type Output = Self;
-    fn div(self, other: Self) -> Self::Output {
-        let (q, _) = divmod(&self, &other);
+impl Div<&ZRootTwo> for &ZRootTwo {
+    type Output = ZRootTwo;
+    fn div(self, other: &ZRootTwo) -> ZRootTwo {
+        let (q, _) = divmod(self, other);
         q
     }
 }
 
-impl Div<IBig> for ZRootTwo {
-    type Output = Self;
-    fn div(self, other: IBig) -> Self::Output {
-        self / ZRootTwo::from_int(other)
+impl Div<IBig> for &ZRootTwo {
+    type Output = ZRootTwo;
+    fn div(self, other: IBig) -> ZRootTwo {
+        self / &ZRootTwo::from_int(other)
     }
 }
 
@@ -329,6 +336,6 @@ pub fn divmod(x: &ZRootTwo, y: &ZRootTwo) -> (ZRootTwo, ZRootTwo) {
     let p = x * &y.conj_sq2();
     let k = y.norm();
     let q = ZRootTwo::new(rounddiv(p.a, &k), rounddiv(p.b, &k));
-    let r = x.clone() - y * &q;
+    let r = x - y * &q;
     (q, r)
 }

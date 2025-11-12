@@ -7,7 +7,13 @@ use dashu_int::IBig;
 use once_cell::sync::Lazy;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub static PREC_BITS: AtomicUsize = AtomicUsize::new(1000);
+const PREC_BITS_INITIAL: usize = 1000;
+pub static PREC_BITS: AtomicUsize = AtomicUsize::new(PREC_BITS_INITIAL);
+
+// Reset precision to the initial value
+pub fn reset_prec_bits() {
+    PREC_BITS.store(PREC_BITS_INITIAL, Ordering::Relaxed);
+}
 
 pub fn set_prec_bits(bits: usize) {
     PREC_BITS.store(bits, Ordering::Relaxed);

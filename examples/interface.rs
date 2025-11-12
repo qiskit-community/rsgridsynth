@@ -19,7 +19,9 @@ fn main() {
     let seed = 1234;
     // This flag is currently ignored
     let up_to_phase = false;
-    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed, up_to_phase);
+    let verbose = false;
+    let mut gridsynth_config =
+        config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
     let gates = gridsynth_gates(&mut gridsynth_config);
     println!("{}", gates);
 }

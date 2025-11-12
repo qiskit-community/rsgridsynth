@@ -221,7 +221,7 @@ impl DOmega {
 
             let mut new_u = self.u.clone() * (IBig::ONE << d_div_2_usize);
             if d_mod_2 == 1 {
-                new_u = new_u * ZOmega::new(IBig::NEG_ONE, IBig::ZERO, IBig::ONE, IBig::ZERO);
+                new_u = &new_u * &ZOmega::new(IBig::NEG_ONE, IBig::ZERO, IBig::ONE, IBig::ZERO);
             }
 
             Self::new(new_u, self.k)
@@ -286,7 +286,7 @@ impl Add<DOmega> for DOmega {
                 let k = self.k;
                 self + rhs.renew_denomexp(k)
             }
-            std::cmp::Ordering::Equal => Self::new(self.u + rhs.u, self.k),
+            std::cmp::Ordering::Equal => Self::new(&self.u + &rhs.u, self.k),
         }
     }
 }
@@ -355,7 +355,7 @@ impl Mul<IBig> for DOmega {
 impl Mul<DOmega> for DOmega {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self {
-        Self::new(self.u * rhs.u, self.k + rhs.k)
+        Self::new(&self.u * &rhs.u, self.k + rhs.k)
     }
 }
 
