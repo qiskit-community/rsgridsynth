@@ -93,6 +93,11 @@ fn build_command() -> Command {
                 .short('g')
                 .action(clap::ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("check")
+                .long("check")
+                .action(clap::ArgAction::SetTrue),
+        )
 }
 
 fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
@@ -127,6 +132,7 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         .unwrap();
     let verbose = matches.get_flag("verbose");
     let measure_time = matches.get_flag("time");
+    let check_solution = matches.get_flag("check");
 
     let seed = matches.get_one::<String>("seed").unwrap().parse().unwrap();
     let rng: StdRng = SeedableRng::seed_from_u64(seed);
@@ -142,5 +148,6 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         verbose,
         measure_time,
         diophantine_data,
+        check_solution,
     }
 }

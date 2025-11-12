@@ -12,6 +12,7 @@ use crate::tdgp::solve_tdgp;
 use crate::tdgp::Region;
 use crate::to_upright::to_upright_set_pair;
 use crate::unitary::DOmegaUnitary;
+use dashu_base::SquareRoot;
 use dashu_float::round::mode::{self, HalfEven};
 use dashu_float::{Context, FBig};
 use dashu_int::IBig;
@@ -20,6 +21,7 @@ use dashu_int::IBig;
 use log::debug;
 
 use nalgebra::{Matrix2, Vector2};
+use num::Complex;
 use std::cmp::Ordering;
 use std::time::{Duration, Instant};
 
@@ -40,6 +42,46 @@ fn matrix_multiply_2x2(
     }
 
     result
+}
+
+fn rotation_mat(theta: &FBig<HalfEven>) -> Matrix2<Complex<FBig<HalfEven>>> {
+    let two = fb_with_prec(FBig::try_from(2.0).unwrap());
+    let theta_half = fb_with_prec(theta / &two);
+    let neg_theta_half = -fb_with_prec(theta_half);
+    let z_x: FBig<HalfEven> = fb_with_prec(cos_fbig(&neg_theta_half));
+    let z_y: FBig<HalfEven> = fb_with_prec(sin_fbig(&neg_theta_half));
+    let neg_z_y: FBig<HalfEven> = -fb_with_prec(z_y.clone());
+    let zero: FBig<HalfEven> = ib_to_bf_prec(IBig::ZERO);
+
+    Matrix2::new(
+        Complex::new(z_x.clone(), z_y.clone()),
+        Complex::new(zero.clone(), zero.clone()),
+        Complex::new(zero.clone(), zero.clone()),
+        Complex::new(z_x.clone(), neg_z_y.clone()),
+    )
+}
+
+/// Checks correctness of the synthesized circuit.
+fn check_solution(gates: &str, theta: &FBig<HalfEven>, epsilon: &FBig<HalfEven>) {
+    let synthesized = DOmegaUnitary::from_gates(gates).to_complex();
+    let expected = rotation_mat(theta);
+
+    // The unitary corresponding to the sequence of gates should approximate the Rz(theta) rotation in the operator
+    // (spectral) norm, we should have ||U - Rz(theta)|| < epsilon.
+    // Here we compute instead the Frobeneius norm ||U - Rz(theta)||_fro, just because it is easier to compute.
+    // For 2x2 matrices, it holds that ||U - Rz(theta)||_fro <= ||U - Rz(theta)|| <= sqrt(2) * ||U - Rz(theta)||_fro.
+    let mut sumsq = FBig::<HalfEven>::ZERO;
+    synthesized.iter().zip(expected.iter()).for_each(|(a, b)| {
+        let diff_re = &a.re - &b.re;
+        let diff_im = &a.im - &b.im;
+        let abs_sq = &diff_re * &diff_re + &diff_im * &diff_im;
+        sumsq += abs_sq;
+    });
+    let norm_fro = fb_with_prec(sumsq.sqrt());
+    let max_allowed_error = fb_with_prec(epsilon * &FBig::from(2));
+
+    let ok = norm_fro < max_allowed_error;
+    println!("Solution is correct: {ok:?}");
 }
 
 #[derive(Debug)]
@@ -402,6 +444,10 @@ pub fn gridsynth_gates(config: &mut GridSynthConfig) -> String {
                 start.elapsed().as_secs_f64() * 1000.0
             );
         }
+    }
+
+    if config.check_solution {
+        check_solution(&gates, &config.theta, &config.epsilon);
     }
     gates
 }
