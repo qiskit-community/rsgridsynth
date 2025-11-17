@@ -59,7 +59,7 @@ impl DOmegaUnitary {
     }
 
     /// Returns 2x2 nalgebra matrix
-    pub fn to_complex(&self) -> Matrix2<Complex<FBig<HalfEven>>> {
+    pub fn to_complex_matrix(&self) -> Matrix2<Complex<FBig<HalfEven>>> {
         let mat = self.to_matrix();
         Matrix2::new(
             Complex::new(mat[0][0].real().clone(), mat[0][0].imag().clone()),
@@ -175,6 +175,7 @@ impl DOmegaUnitary {
         let mut unitary = Self::identity();
         for g in gates.chars().rev() {
             unitary = match g {
+                'I' => unitary,
                 'H' => unitary.renew_denomexp(unitary.k() + 1).mul_by_h_from_left(),
                 'T' => unitary.mul_by_t_from_left(),
                 'S' => unitary.mul_by_s_from_left(),

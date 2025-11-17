@@ -23,7 +23,7 @@ fn simple_test() {
     for (seed, expected_gates) in test_inputs {
         clear_caches();
         let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed, verbose);
-        let gates = gridsynth_gates(&mut gridsynth_config);
+        let gates = gridsynth_gates(&mut gridsynth_config).gates;
         assert_eq!(gates, expected_gates, "Test failed for seed: {}", seed);
     }
 }
@@ -42,7 +42,7 @@ fn pi_over_two_test() {
         for seed in seeds {
             clear_caches();
             let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed, verbose);
-            let gates = gridsynth_gates(&mut gridsynth_config);
+            let gates = gridsynth_gates(&mut gridsynth_config).gates;
             let expected_gates = "SWWWWWWW";
             assert_eq!(gates, expected_gates);
         }
@@ -59,8 +59,36 @@ fn slowness_from_allocation_test() {
     let seed = 1234;
     let verbose = false;
     let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed, verbose);
-    let gates = gridsynth_gates(&mut gridsynth_config);
+    let gates = gridsynth_gates(&mut gridsynth_config).gates;
     let expected_gates = "SHTSHTHTSHTSHTHTSHTHTHTSHTSHTSHTHTSHTSHTHTHTSHTSHTSHTHTHTSHTHTSHTSHTSHTSHTSHTSHTSHTHTHTHTSHTHTHTHTHTHTSHTSHTHTHTSHTSHTHTHTHTSHTSHTHTSHTSHTSHTHTSHTHTHTSHTSHTHTSHTSHTSHTHTSHTHTHTSHTHTHTSHTSHTSHTSHTHTHTHTHTSHTSHTSHTHTSHTSHTHTSHTHTSHTHTHTHTSHTSHTHTSHTSHTSHTHTSHTSHTSHTHTSHTHTHTSHTHTHTSHTSHTHTSHTSHTHTSHTSHTSHTHTHTSHTSHTSHTSHTHTHTHTSHTHTHTHTHTSHTSHTHTSHSWW";
 
     assert_eq!(gates, expected_gates);
+}
+
+#[test]
+#[serial]
+fn test_correct_decomposition() {
+    let epsilon = 1e-8;
+
+    let verbose = false;
+    let seed = 0u64;
+
+    let thetas = (0..32).map(|k| k as f64 * std::f64::consts::PI / 16.0);
+
+    for theta in thetas {
+        clear_caches();
+        let mut gridsynth_config =
+            config_from_theta_epsilon(theta, epsilon, seed, verbose).with_check_solution(true);
+
+        let res = gridsynth_gates(&mut gridsynth_config);
+
+        // not printed, unless cargo test is run with -- -no-capture
+        println!(
+            "theta = {theta}, gates = {}, correct = {:?}",
+            res.gates, res.is_correct
+        );
+
+        // Check that the check result exits and is valid.
+        assert!(res.is_correct.is_some_and(|v| v));
+    }
 }

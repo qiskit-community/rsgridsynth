@@ -18,8 +18,7 @@ fn main() {
     let epsilon = 1e-10;
     let seed = 1234;
     let verbose = false;
-    let mut gridsynth_config =
-        config_from_theta_epsilon(theta, epsilon, seed, verbose).with_check_solution(true);
-    let gates = gridsynth_gates(&mut gridsynth_config);
-    println!("{}", gates);
+    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed, verbose);
+    let res = gridsynth_gates(&mut gridsynth_config);
+    println!("{}", res.gates);
 }

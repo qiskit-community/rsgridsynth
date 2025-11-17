@@ -47,14 +47,14 @@ fn main() {
         None
     };
 
-    let gates = gridsynth_gates(&mut args);
+    let res = gridsynth_gates(&mut args);
 
     if let Some(start_time) = start {
         let elapsed = start_time.elapsed();
         info!("Elapsed time: {:.3?}", elapsed);
     }
 
-    println!("{}", gates);
+    println!("{}", res.gates);
 }
 
 fn build_command() -> Command {

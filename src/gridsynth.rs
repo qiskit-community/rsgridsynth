@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
 use crate::common::{cos_fbig, fb_with_prec, get_prec_bits, ib_to_bf_prec, sin_fbig};
-use crate::config::GridSynthConfig;
+use crate::config::{GridSynthConfig, GridSynthResult};
 use crate::diophantine::diophantine_dyadic;
 use crate::math::solve_quadratic;
 use crate::region::Ellipse;
@@ -62,26 +62,26 @@ fn rotation_mat(theta: &FBig<HalfEven>) -> Matrix2<Complex<FBig<HalfEven>>> {
 }
 
 /// Checks correctness of the synthesized circuit.
-fn check_solution(gates: &str, theta: &FBig<HalfEven>, epsilon: &FBig<HalfEven>) {
-    let synthesized = DOmegaUnitary::from_gates(gates).to_complex();
+fn check_solution(gates: &str, theta: &FBig<HalfEven>, epsilon: &FBig<HalfEven>) -> bool {
     let expected = rotation_mat(theta);
+    let synthesized = DOmegaUnitary::from_gates(gates).to_complex_matrix();
 
-    // The unitary corresponding to the sequence of gates should approximate the Rz(theta) rotation in the operator
-    // (spectral) norm, we should have ||U - Rz(theta)|| < epsilon.
-    // Here we compute instead the Frobeneius norm ||U - Rz(theta)||_fro, just because it is easier to compute.
-    // For 2x2 matrices, it holds that ||U - Rz(theta)||_fro <= ||U - Rz(theta)|| <= sqrt(2) * ||U - Rz(theta)||_fro.
-    let mut sumsq = FBig::<HalfEven>::ZERO;
-    synthesized.iter().zip(expected.iter()).for_each(|(a, b)| {
-        let diff_re = &a.re - &b.re;
-        let diff_im = &a.im - &b.im;
-        let abs_sq = &diff_re * &diff_re + &diff_im * &diff_im;
-        sumsq += abs_sq;
-    });
-    let norm_fro = fb_with_prec(sumsq.sqrt());
-    let max_allowed_error = fb_with_prec(epsilon * &FBig::from(2));
+    // x = e^{-i theta / 2}
+    let x = expected[(0, 0)].clone();
+    let u = synthesized[(0, 0)].clone();
 
-    let ok = norm_fro < max_allowed_error;
-    println!("Solution is correct: {ok:?}");
+    // This computes the eigenvalues of A^* A, where A = expected - synthesized.
+    // The operator norm is the square root of this.
+    let eig: FBig<HalfEven> = 2 - 2 * (&x.re * &u.re + &x.im * &u.im);
+
+    // Due to small numerical imprecisions when computing cos(\theta / 2), it may happen that we
+    // get a slightly negative value.
+    let eig = eig.max(FBig::from(0));
+
+    // Compute the norm.
+    let norm = fb_with_prec(eig.sqrt());
+
+    norm < *epsilon
 }
 
 #[derive(Debug)]
@@ -413,7 +413,7 @@ fn gridsynth(config: &mut GridSynthConfig) -> DOmegaUnitary {
     search_for_solution(&epsilon_region, &unit_disk, &transformed, config)
 }
 
-pub fn gridsynth_gates(config: &mut GridSynthConfig) -> String {
+pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
     let start_total = if config.measure_time {
         Some(Instant::now())
     } else {
@@ -446,8 +446,12 @@ pub fn gridsynth_gates(config: &mut GridSynthConfig) -> String {
         }
     }
 
-    if config.check_solution {
-        check_solution(&gates, &config.theta, &config.epsilon);
-    }
-    gates
+    // Peform validation check, if required.
+    let is_correct = if config.check_solution {
+        Some(check_solution(&gates, &config.theta, &config.epsilon))
+    } else {
+        None
+    };
+
+    GridSynthResult { gates, is_correct }
 }
