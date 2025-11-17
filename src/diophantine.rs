@@ -863,6 +863,7 @@ pub(crate) fn diophantine_dyadic(
     xi: DRootTwo,
     diophantine_data: &mut DiophantineData,
 ) -> Option<DOmega> {
+    // println!("in diophantine_dyadic");
     let cache_key = (xi.alpha.a.clone(), xi.alpha.b.clone());
     if let Ok(cache) = DIOPHANTINE_CACHE.try_lock() {
         if let Some(cached_result) = cache.get(&cache_key) {
