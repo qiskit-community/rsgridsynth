@@ -34,13 +34,13 @@ pub const DELTA_SQUARED: DRootTwo = DRootTwo {
     k: 0,
 };
 
-pub const DELTA_SQUARED_M: DRootTwo = DRootTwo {
-    alpha: ZRootTwo {
-        a: IBig::from_parts_const(Sign::Positive, 2),
-        b: IBig::NEG_ONE,
-    },
-    k: 0,
-};
+// pub const DELTA_SQUARED_M: DRootTwo = DRootTwo {
+//     alpha: ZRootTwo {
+//         a: IBig::from_parts_const(Sign::Positive, 2),
+//         b: IBig::NEG_ONE,
+//     },
+//     k: 0,
+// };
 
 impl DRootTwo {
     pub fn new(alpha: ZRootTwo, k: i64) -> Self {

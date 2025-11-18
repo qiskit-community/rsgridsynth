@@ -47,14 +47,14 @@ fn main() {
         None
     };
 
-    let gates = gridsynth_gates(&mut args);
+    let res = gridsynth_gates(&mut args);
 
     if let Some(start_time) = start {
         let elapsed = start_time.elapsed();
         info!("Elapsed time: {:.3?}", elapsed);
     }
 
-    println!("{}", gates);
+    println!("{}", res.gates);
 }
 
 fn build_command() -> Command {
@@ -98,6 +98,11 @@ fn build_command() -> Command {
             Arg::new("phase")
                 .long("phase")
                 .short('p')
+                .action(clap::ArgAction::SetFalse),
+        )
+        .arg(
+            Arg::new("check")
+                .long("check")
                 .action(clap::ArgAction::SetTrue),
         )
 }
@@ -135,6 +140,7 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
     let verbose = matches.get_flag("verbose");
     let measure_time = matches.get_flag("time");
     let up_to_phase = matches.get_flag("phase");
+    let check_solution = matches.get_flag("check");
 
     let seed = matches.get_one::<String>("seed").unwrap().parse().unwrap();
     let rng: StdRng = SeedableRng::seed_from_u64(seed);
@@ -151,5 +157,6 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         measure_time,
         diophantine_data,
         up_to_phase,
+        check_solution,
     }
 }

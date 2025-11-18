@@ -21,6 +21,28 @@ pub struct GridSynthConfig {
     pub measure_time: bool,
     pub diophantine_data: DiophantineData,
     pub up_to_phase: bool,
+    pub check_solution: bool,
+}
+
+impl GridSynthConfig {
+    /// Turns on or off checking solutions at the end of the run
+    pub fn with_check_solution(self, check_solution: bool) -> Self {
+        Self {
+            check_solution,
+            ..self
+        }
+    }
+}
+
+/// The result of running the gridsynth algorithm
+pub struct GridSynthResult {
+    /// List of gates.
+    pub gates: String,
+
+    // /// The global phase factor.
+    // pub global_phase: bool,
+    /// If correctness is performed, stores the result.
+    pub is_correct: Option<bool>,
 }
 
 pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
@@ -111,5 +133,6 @@ pub fn config_from_theta_epsilon(
         measure_time: time,
         diophantine_data,
         up_to_phase,
+        check_solution: false,
     }
 }

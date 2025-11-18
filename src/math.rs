@@ -170,9 +170,15 @@ pub fn solve_quadratic(
     let s1 = &neg_b - &sqrt_discriminant;
     let s2 = &neg_b + &sqrt_discriminant;
 
-    if b_norm >= ib_to_bf_prec(IBig::ZERO) {
+    let tol = ib_to_bf_prec(IBig::ZERO);
+    if b_norm >= tol {
         Some((s1 / (2 * &a_norm), s2 / (2 * &a_norm)))
     } else {
-        Some(((2 * &c_norm) / &s2, (2 * &c_norm) / &s1))
+        if -tol.clone() < c_norm && c_norm < tol.clone() {
+            Some((FBig::from(0), -b_norm / a_norm))
+        }
+        else {
+            Some(((2 * &c_norm) / &s2, (2 * &c_norm) / &s1))
+        }
     }
 }
