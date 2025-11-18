@@ -173,11 +173,9 @@ pub fn solve_quadratic(
     let tol = ib_to_bf_prec(IBig::ZERO);
     if b_norm >= tol {
         Some((s1 / (2 * &a_norm), s2 / (2 * &a_norm)))
+    } else if -tol.clone() < c_norm && c_norm < tol.clone() {
+        Some((FBig::from(0), -b_norm / a_norm))
     } else {
-        if -tol.clone() < c_norm && c_norm < tol.clone() {
-            Some((FBig::from(0), -b_norm / a_norm))
-        } else {
-            Some(((2 * &c_norm) / &s2, (2 * &c_norm) / &s1))
-        }
+        Some(((2 * &c_norm) / &s2, (2 * &c_norm) / &s1))
     }
 }
