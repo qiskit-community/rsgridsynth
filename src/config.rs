@@ -39,8 +39,9 @@ pub struct GridSynthResult {
     /// List of gates.
     pub gates: String,
 
-    // /// The global phase factor.
-    // pub global_phase: bool,
+    /// The global phase factor.
+    pub global_phase: bool,
+
     /// If correctness is performed, stores the result.
     pub is_correct: Option<bool>,
 }

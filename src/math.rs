@@ -176,8 +176,7 @@ pub fn solve_quadratic(
     } else {
         if -tol.clone() < c_norm && c_norm < tol.clone() {
             Some((FBig::from(0), -b_norm / a_norm))
-        }
-        else {
+        } else {
             Some(((2 * &c_norm) / &s2, (2 * &c_norm) / &s1))
         }
     }

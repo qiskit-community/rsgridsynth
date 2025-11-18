@@ -85,7 +85,8 @@ fn test_correct_decomposition() {
     for theta in thetas {
         clear_caches();
         let mut gridsynth_config =
-            config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase).with_check_solution(true);
+            config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase)
+                .with_check_solution(true);
 
         let res = gridsynth_gates(&mut gridsynth_config);
 

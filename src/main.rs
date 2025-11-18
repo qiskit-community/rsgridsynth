@@ -98,7 +98,7 @@ fn build_command() -> Command {
             Arg::new("phase")
                 .long("phase")
                 .short('p')
-                .action(clap::ArgAction::SetFalse),
+                .action(clap::ArgAction::SetTrue),
         )
         .arg(
             Arg::new("check")
