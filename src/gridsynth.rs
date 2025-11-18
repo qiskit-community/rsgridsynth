@@ -138,11 +138,7 @@ fn check_solution(
     // Compute the norm.
     let norm = fb_with_prec(eig.sqrt());
 
-    let res = norm < *epsilon;
-
-    println!("solution is correct: {:?}", res);
-
-    res
+    norm < *epsilon
 }
 
 #[derive(Debug)]
@@ -577,17 +573,6 @@ pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
         // also shifted synthesis
         let u_approx = gridsynth(config, PhaseMode::Shifted);
         let gates_shifted = decompose_domega_unitary(u_approx);
-
-        println!(
-            "gates_exact = {:?} of len {:?}",
-            gates_exact,
-            gates_exact.len()
-        );
-        println!(
-            "gates_shifted = {:?} of len {:?}",
-            gates_shifted,
-            gates_shifted.len()
-        );
 
         // Peform validation check, if required.
         // For now, make sure to check both sequences.
