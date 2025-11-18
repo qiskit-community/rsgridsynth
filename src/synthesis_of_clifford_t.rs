@@ -61,6 +61,7 @@ pub fn decompose_domega_unitary(mut unitary: DOmegaUnitary) -> String {
         let (g, next_unitary) = reduce_denomexp(unitary);
         gates += &g;
         unitary = next_unitary;
+        println!(".. gate {:?}", g);
     }
     if unitary.n & 1 != 0 {
         gates += "T";

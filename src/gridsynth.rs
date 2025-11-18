@@ -284,6 +284,7 @@ fn process_solution_candidate(mut z: DOmega, mut w: DOmega, phase: PhaseMode) ->
             }
         },
         PhaseMode::Shifted => {
+
             // todo: remove clones
             let k1 = (z.clone() + w.clone()).reduce_denomexp().k;
             let k2 = (z.clone() + w.mul_by_omega()).reduce_denomexp().k;
@@ -326,7 +327,7 @@ where
         let z_with_phase = match phase {
             PhaseMode::Exact => z.clone(),
             // todo: make constant
-            PhaseMode::Shifted => &z * &DOmega::from_zomega(ZOmega::new(IBig::from(0), IBig::from(-1), IBig::from(1), IBig::from(0)))
+            PhaseMode::Shifted => &z * &DOmega::new(ZOmega::new(IBig::from(0), IBig::from(-1), IBig::from(1), IBig::from(0)), 1)
         };
 
         
@@ -346,7 +347,7 @@ where
             }
             println!("==> PROCESS: RETURN SOME");
 
-            return Some(process_solution_candidate(z, w_val, phase));
+            return Some(process_solution_candidate(z_with_phase, w_val, phase));
         }
     }
 
@@ -375,14 +376,19 @@ fn setup_regions_and_transform(
         crate::region::Rectangle,
     ),
 ) {
-    let scale = match phase {
+    let epsilon_region_scale = match phase {
         PhaseMode::Exact => ZRootTwo {a: IBig::from(1), b: IBig::from(0)},
         PhaseMode::Shifted => ZRootTwo {a: IBig::from(2), b: IBig::from(1)},
     };
 
+    let unit_disk_scale = match phase {
+        PhaseMode::Exact => ZRootTwo {a: IBig::from(1), b: IBig::from(0)},
+        PhaseMode::Shifted => ZRootTwo {a: IBig::from(2), b: IBig::from(-1)},
+    };
 
-    let epsilon_region = EpsilonRegion::new(theta, epsilon, scale.clone());
-    let unit_disk = UnitDisk::new(scale.clone());
+
+    let epsilon_region = EpsilonRegion::new(theta, epsilon, epsilon_region_scale);
+    let unit_disk = UnitDisk::new(unit_disk_scale);
 
     let start_upright = if measure_time {
         Some(Instant::now())
@@ -519,11 +525,14 @@ pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
     let gates_exact = decompose_domega_unitary(u_approx);
     println!("gates_exact: {:?}", gates_exact);
 
-    // println!("Running shifted:");
-    // let u_approx = gridsynth(config, PhaseMode::Shifted);
-    // println!("THERE");
-    // let gates_shifted = decompose_domega_unitary(u_approx);
-    // println!("gates_shifted: {:?}", gates_shifted);
+    println!("Running shifted:");
+    let u_approx = gridsynth(config, PhaseMode::Shifted);
+    println!("THERE");
+
+    println!("u_approx = {:?}", u_approx);
+
+    let gates_shifted = decompose_domega_unitary(u_approx);
+    println!("gates_shifted: {:?}", gates_shifted);
     
 
 
