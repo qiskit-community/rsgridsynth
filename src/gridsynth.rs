@@ -375,8 +375,14 @@ fn setup_regions_and_transform(
         crate::region::Rectangle,
     ),
 ) {
-    let epsilon_region = EpsilonRegion::new(theta, epsilon, ZRootTwo {a: IBig::from(1), b: IBig::from(0)});
-    let unit_disk = UnitDisk::new(ZRootTwo {a: IBig::from(1), b: IBig::from(0)});
+    let scale = match phase {
+        PhaseMode::Exact => ZRootTwo {a: IBig::from(1), b: IBig::from(0)},
+        PhaseMode::Shifted => ZRootTwo {a: IBig::from(2), b: IBig::from(1)},
+    };
+
+
+    let epsilon_region = EpsilonRegion::new(theta, epsilon, scale.clone());
+    let unit_disk = UnitDisk::new(scale.clone());
 
     let start_upright = if measure_time {
         Some(Instant::now())
