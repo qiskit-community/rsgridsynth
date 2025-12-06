@@ -78,16 +78,20 @@ fn test_correct_decomposition() {
     for theta in thetas {
         clear_caches();
         let mut gridsynth_config =
-            config_from_theta_epsilon(theta, epsilon, seed, verbose).with_check_solution(true);
+            config_from_theta_epsilon(theta, epsilon, seed, verbose).with_compute_error(true);
 
         let res = gridsynth_gates(&mut gridsynth_config);
 
         // not printed, unless cargo test is run with -- -no-capture
-        println!(
-            "theta = {theta}, gates = {}, correct = {:?}",
-            res.gates, res.is_correct
-        );
-
+        match res.error {
+            Some(error) => {
+                println!(
+                    "theta = {theta}, gates = {}, error = {:.6e}, correct = {:?}",
+                    res.gates, error, res.is_correct,
+                )
+            }
+            None => panic!("Expected computed error"),
+        }
         // Check that the check result exits and is valid.
         assert!(res.is_correct.is_some_and(|v| v));
     }

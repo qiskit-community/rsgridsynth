@@ -12,7 +12,7 @@ use crate::tdgp::solve_tdgp;
 use crate::tdgp::Region;
 use crate::to_upright::to_upright_set_pair;
 use crate::unitary::DOmegaUnitary;
-use dashu_base::SquareRoot;
+use dashu_base::{Approximation, SquareRoot};
 use dashu_float::round::mode::{self, HalfEven};
 use dashu_float::{Context, FBig};
 use dashu_int::IBig;
@@ -62,7 +62,7 @@ fn rotation_mat(theta: &FBig<HalfEven>) -> Matrix2<Complex<FBig<HalfEven>>> {
 }
 
 /// Checks correctness of the synthesized circuit.
-fn check_solution(gates: &str, theta: &FBig<HalfEven>, epsilon: &FBig<HalfEven>) -> bool {
+fn compute_error(gates: &str, theta: &FBig<HalfEven>, epsilon: &FBig<HalfEven>) -> (f64, bool) {
     let expected = rotation_mat(theta);
     let synthesized = DOmegaUnitary::from_gates(gates).to_complex_matrix();
 
@@ -80,8 +80,12 @@ fn check_solution(gates: &str, theta: &FBig<HalfEven>, epsilon: &FBig<HalfEven>)
 
     // Compute the norm.
     let norm = fb_with_prec(eig.sqrt());
-
-    norm < *epsilon
+    // High precision is needed only for the synthesis algorithm
+    let fnorm = match norm.to_f64() {
+        Approximation::Inexact(v, _) => v,
+        Approximation::Exact(v) => v,
+    };
+    (fnorm, norm < *epsilon)
 }
 
 #[derive(Debug)]
@@ -447,11 +451,16 @@ pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
     }
 
     // Peform validation check, if required.
-    let is_correct = if config.check_solution {
-        Some(check_solution(&gates, &config.theta, &config.epsilon))
+    let (error, is_correct) = if config.compute_error {
+        let (error, is_correct) = compute_error(&gates, &config.theta, &config.epsilon);
+        (Some(error), Some(is_correct))
     } else {
-        None
+        (None, None)
     };
 
-    GridSynthResult { gates, is_correct }
+    GridSynthResult {
+        gates,
+        error,
+        is_correct,
+    }
 }
