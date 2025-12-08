@@ -19,6 +19,6 @@ fn main() {
     let seed = 1234;
     let verbose = false;
     let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed, verbose);
-    let gates = gridsynth_gates(&mut gridsynth_config);
-    println!("{}", gates);
+    let res = gridsynth_gates(&mut gridsynth_config);
+    println!("{}", res.gates);
 }

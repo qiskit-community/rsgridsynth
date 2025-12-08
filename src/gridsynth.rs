@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
 use crate::common::{cos_fbig, fb_with_prec, get_prec_bits, ib_to_bf_prec, sin_fbig};
-use crate::config::GridSynthConfig;
+use crate::config::{GridSynthConfig, GridSynthResult};
 use crate::diophantine::diophantine_dyadic;
 use crate::math::solve_quadratic;
 use crate::region::Ellipse;
@@ -12,6 +12,7 @@ use crate::tdgp::solve_tdgp;
 use crate::tdgp::Region;
 use crate::to_upright::to_upright_set_pair;
 use crate::unitary::DOmegaUnitary;
+use dashu_base::{Approximation, SquareRoot};
 use dashu_float::round::mode::{self, HalfEven};
 use dashu_float::{Context, FBig};
 use dashu_int::IBig;
@@ -20,6 +21,7 @@ use dashu_int::IBig;
 use log::debug;
 
 use nalgebra::{Matrix2, Vector2};
+use num::Complex;
 use std::cmp::Ordering;
 use std::time::{Duration, Instant};
 
@@ -40,6 +42,50 @@ fn matrix_multiply_2x2(
     }
 
     result
+}
+
+fn rotation_mat(theta: &FBig<HalfEven>) -> Matrix2<Complex<FBig<HalfEven>>> {
+    let two = fb_with_prec(FBig::try_from(2.0).unwrap());
+    let theta_half = fb_with_prec(theta / &two);
+    let neg_theta_half = -fb_with_prec(theta_half);
+    let z_x: FBig<HalfEven> = fb_with_prec(cos_fbig(&neg_theta_half));
+    let z_y: FBig<HalfEven> = fb_with_prec(sin_fbig(&neg_theta_half));
+    let neg_z_y: FBig<HalfEven> = -fb_with_prec(z_y.clone());
+    let zero: FBig<HalfEven> = ib_to_bf_prec(IBig::ZERO);
+
+    Matrix2::new(
+        Complex::new(z_x.clone(), z_y.clone()),
+        Complex::new(zero.clone(), zero.clone()),
+        Complex::new(zero.clone(), zero.clone()),
+        Complex::new(z_x.clone(), neg_z_y.clone()),
+    )
+}
+
+/// Checks correctness of the synthesized circuit.
+fn compute_error(gates: &str, theta: &FBig<HalfEven>, epsilon: &FBig<HalfEven>) -> (f64, bool) {
+    let expected = rotation_mat(theta);
+    let synthesized = DOmegaUnitary::from_gates(gates).to_complex_matrix();
+
+    // x = e^{-i theta / 2}
+    let x = expected[(0, 0)].clone();
+    let u = synthesized[(0, 0)].clone();
+
+    // This computes the eigenvalues of A^* A, where A = expected - synthesized.
+    // The operator norm is the square root of this.
+    let eig: FBig<HalfEven> = 2 - 2 * (&x.re * &u.re + &x.im * &u.im);
+
+    // Due to small numerical imprecisions when computing cos(\theta / 2), it may happen that we
+    // get a slightly negative value.
+    let eig = eig.max(FBig::from(0));
+
+    // Compute the norm.
+    let norm = fb_with_prec(eig.sqrt());
+    // High precision is needed only for the synthesis algorithm
+    let fnorm = match norm.to_f64() {
+        Approximation::Inexact(v, _) => v,
+        Approximation::Exact(v) => v,
+    };
+    (fnorm, norm < *epsilon)
 }
 
 #[derive(Debug)]
@@ -371,7 +417,7 @@ fn gridsynth(config: &mut GridSynthConfig) -> DOmegaUnitary {
     search_for_solution(&epsilon_region, &unit_disk, &transformed, config)
 }
 
-pub fn gridsynth_gates(config: &mut GridSynthConfig) -> String {
+pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
     let start_total = if config.measure_time {
         Some(Instant::now())
     } else {
@@ -403,5 +449,18 @@ pub fn gridsynth_gates(config: &mut GridSynthConfig) -> String {
             );
         }
     }
-    gates
+
+    // Peform validation check, if required.
+    let (error, is_correct) = if config.compute_error {
+        let (error, is_correct) = compute_error(&gates, &config.theta, &config.epsilon);
+        (Some(error), Some(is_correct))
+    } else {
+        (None, None)
+    };
+
+    GridSynthResult {
+        gates,
+        error,
+        is_correct,
+    }
 }

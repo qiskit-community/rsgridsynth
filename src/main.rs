@@ -47,14 +47,17 @@ fn main() {
         None
     };
 
-    let gates = gridsynth_gates(&mut args);
+    let res = gridsynth_gates(&mut args);
 
     if let Some(start_time) = start {
         let elapsed = start_time.elapsed();
         info!("Elapsed time: {:.3?}", elapsed);
     }
 
-    println!("{}", gates);
+    if let Some(error) = res.error {
+        println!("error: {:.6e}", error);
+    }
+    println!("{}", res.gates);
 }
 
 fn build_command() -> Command {
@@ -93,6 +96,11 @@ fn build_command() -> Command {
                 .short('g')
                 .action(clap::ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("error")
+                .long("error")
+                .action(clap::ArgAction::SetTrue),
+        )
 }
 
 fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
@@ -127,6 +135,7 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         .unwrap();
     let verbose = matches.get_flag("verbose");
     let measure_time = matches.get_flag("time");
+    let compute_error = matches.get_flag("error");
 
     let seed = matches.get_one::<String>("seed").unwrap().parse().unwrap();
     let rng: StdRng = SeedableRng::seed_from_u64(seed);
@@ -142,5 +151,6 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         verbose,
         measure_time,
         diophantine_data,
+        compute_error,
     }
 }
