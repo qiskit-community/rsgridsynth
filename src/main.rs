@@ -54,6 +54,9 @@ fn main() {
         info!("Elapsed time: {:.3?}", elapsed);
     }
 
+    if let Some(error) = res.error {
+        println!("error: {:.6e}", error);
+    }
     println!("{}", res.gates);
 }
 
@@ -101,8 +104,8 @@ fn build_command() -> Command {
                 .action(clap::ArgAction::SetTrue),
         )
         .arg(
-            Arg::new("check")
-                .long("check")
+            Arg::new("error")
+                .long("error")
                 .action(clap::ArgAction::SetTrue),
         )
 }
@@ -140,7 +143,7 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
     let verbose = matches.get_flag("verbose");
     let measure_time = matches.get_flag("time");
     let up_to_phase = matches.get_flag("phase");
-    let check_solution = matches.get_flag("check");
+    let compute_error = matches.get_flag("error");
 
     let seed = matches.get_one::<String>("seed").unwrap().parse().unwrap();
     let rng: StdRng = SeedableRng::seed_from_u64(seed);
@@ -157,6 +160,6 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         measure_time,
         diophantine_data,
         up_to_phase,
-        check_solution,
+        compute_error,
     }
 }

@@ -21,14 +21,14 @@ pub struct GridSynthConfig {
     pub measure_time: bool,
     pub diophantine_data: DiophantineData,
     pub up_to_phase: bool,
-    pub check_solution: bool,
+    pub compute_error: bool,
 }
 
 impl GridSynthConfig {
     /// Turns on or off checking solutions at the end of the run
-    pub fn with_check_solution(self, check_solution: bool) -> Self {
+    pub fn with_compute_error(self, compute_error: bool) -> Self {
         Self {
-            check_solution,
+            compute_error,
             ..self
         }
     }
@@ -42,7 +42,10 @@ pub struct GridSynthResult {
     /// The global phase factor.
     pub global_phase: bool,
 
-    /// If correctness is performed, stores the result.
+    /// If error is computed, stores the error.
+    pub error: Option<f64>,
+
+    /// If error is computed, stores whether approximation is correct.
     pub is_correct: Option<bool>,
 }
 
@@ -134,6 +137,6 @@ pub fn config_from_theta_epsilon(
         measure_time: time,
         diophantine_data,
         up_to_phase,
-        check_solution: false,
+        compute_error: false,
     }
 }

@@ -13,7 +13,7 @@ use crate::tdgp::solve_tdgp;
 use crate::tdgp::Region;
 use crate::to_upright::to_upright_set_pair;
 use crate::unitary::DOmegaUnitary;
-use dashu_base::SquareRoot;
+use dashu_base::{Approximation, SquareRoot};
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::IBig;
@@ -107,12 +107,12 @@ fn to_fbig(x: f64) -> FBig<HalfEven> {
 }
 
 /// Checks correctness of the synthesized circuit.
-fn check_solution(
+fn compute_error(
     gates: &str,
     theta: &FBig<HalfEven>,
     epsilon: &FBig<HalfEven>,
     phase: PhaseMode,
-) -> bool {
+) -> (f64, bool) {
     let expected = rotation_mat(theta);
     let synthesized = DOmegaUnitary::from_gates(gates).to_complex_matrix();
 
@@ -137,8 +137,12 @@ fn check_solution(
 
     // Compute the norm.
     let norm = fb_with_prec(eig.sqrt());
-
-    norm < *epsilon
+    // High precision is needed only for the synthesis algorithm
+    let fnorm = match norm.to_f64() {
+        Approximation::Inexact(v, _) => v,
+        Approximation::Exact(v) => v,
+    };
+    (fnorm, norm < *epsilon)
 }
 
 #[derive(Debug)]
@@ -548,21 +552,20 @@ pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
         let u_approx = gridsynth(config, PhaseMode::Exact);
         let gates = decompose_domega_unitary(u_approx);
 
-        // Peform validation check, if required.
-        let is_correct = if config.check_solution {
-            Some(check_solution(
-                &gates,
-                &config.theta,
-                &config.epsilon,
-                PhaseMode::Exact,
-            ))
-        } else {
-            None
+        // Perform validation check, if required.
+        let (error, is_correct) = match config.compute_error {
+            true => {
+                let (e, is_ok) =
+                    compute_error(&gates, &config.theta, &config.epsilon, PhaseMode::Exact);
+                (Some(e), Some(is_ok))
+            }
+            false => (None, None),
         };
 
         GridSynthResult {
             gates,
             global_phase: false,
+            error,
             is_correct,
         }
     } else {
@@ -574,55 +577,46 @@ pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
         let u_approx = gridsynth(config, PhaseMode::Shifted);
         let gates_shifted = decompose_domega_unitary(u_approx);
 
-        // Peform validation check, if required.
-        // For now, make sure to check both sequences.
-        let is_correct = if config.check_solution {
-            Some(
-                check_solution(
-                    &gates_exact,
-                    &config.theta,
-                    &config.epsilon,
-                    PhaseMode::Exact,
-                ) && check_solution(
-                    &gates_shifted,
-                    &config.theta,
-                    &config.epsilon,
-                    PhaseMode::Shifted,
-                ),
-            )
-        } else {
-            None
-        };
+        if gates_exact.len() <= gates_shifted.len() {
+            let (error, is_correct) = match config.compute_error {
+                true => {
+                    let (e, is_ok) = compute_error(
+                        &gates_exact,
+                        &config.theta,
+                        &config.epsilon,
+                        PhaseMode::Exact,
+                    );
+                    (Some(e), Some(is_ok))
+                }
+                false => (None, None),
+            };
 
-        if gates_exact.len() < gates_shifted.len() {
             GridSynthResult {
                 gates: gates_exact,
                 global_phase: false,
+                error,
                 is_correct,
             }
         } else {
+            let (error, is_correct) = match config.compute_error {
+                true => {
+                    let (e, is_ok) = compute_error(
+                        &gates_shifted,
+                        &config.theta,
+                        &config.epsilon,
+                        PhaseMode::Shifted,
+                    );
+                    (Some(e), Some(is_ok))
+                }
+                false => (None, None),
+            };
+
             GridSynthResult {
                 gates: gates_shifted,
                 global_phase: true,
+                error,
                 is_correct,
             }
         }
     }
-
-    // if let Some(start) = start_decompose {
-    //     if config.measure_time {
-    //         debug!(
-    //             "time of decompose_domega_unitary: {:.3} ms",
-    //             start.elapsed().as_secs_f64() * 1000.0
-    //         );
-    //     }
-    // }
-    // if let Some(start) = start_total {
-    //     if config.measure_time {
-    //         debug!(
-    //             "total time: {:.3} ms",
-    //             start.elapsed().as_secs_f64() * 1000.0
-    //         );
-    //     }
-    // }
 }

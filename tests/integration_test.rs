@@ -100,15 +100,20 @@ fn test_correct_decomposition_exact() {
         clear_caches();
         let mut gridsynth_config =
             config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase)
-                .with_check_solution(true);
+                .with_compute_error(true);
 
         let res = gridsynth_gates(&mut gridsynth_config);
 
-        // not printed, unless cargo test is run with -- --no-capture
-        // println!(
-        //     "theta = {theta}, gates = {}, correct = {:?}",
-        //     res.gates, res.is_correct
-        // );
+        // not printed, unless cargo test is run with -- -no-capture
+        match res.error {
+            Some(error) => {
+                println!(
+                    "theta = {theta}, gates = {}, error = {:.6e}, correct = {:?}",
+                    res.gates, error, res.is_correct,
+                )
+            }
+            None => panic!("Expected computed error"),
+        }
 
         // Check that the check result exits and is valid.
         assert!(res.is_correct.is_some_and(|v| v));
@@ -130,16 +135,20 @@ fn test_correct_decomposition_up_to_phase() {
         clear_caches();
         let mut gridsynth_config =
             config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase)
-                .with_check_solution(true);
+                .with_compute_error(true);
 
         let res = gridsynth_gates(&mut gridsynth_config);
 
-        // not printed, unless cargo test is run with -- --no-capture
-        // println!(
-        //     "theta = {theta}, gates = {}, correct = {:?}",
-        //     res.gates, res.is_correct
-        // );
-
+        // not printed, unless cargo test is run with -- -no-capture
+        match res.error {
+            Some(error) => {
+                println!(
+                    "theta = {theta}, gates = {}, error = {:.6e}, correct = {:?}",
+                    res.gates, error, res.is_correct,
+                )
+            }
+            None => panic!("Expected computed error"),
+        }
         // Check that the check result exits and is valid.
         assert!(res.is_correct.is_some_and(|v| v));
     }
