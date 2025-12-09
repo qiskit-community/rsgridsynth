@@ -17,7 +17,6 @@ fn main() {
     let theta = pi / 8.0;
     let epsilon = 1e-10;
     let seed = 1234;
-    // This flag is currently ignored
     let up_to_phase = false;
     let verbose = false;
     let mut gridsynth_config =
