@@ -572,12 +572,14 @@ pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
         // exact synthesis
         let u_approx = gridsynth(config, PhaseMode::Exact);
         let gates_exact = decompose_domega_unitary(u_approx);
+        let t_count_exact = gates_exact.chars().filter(|&c| c == 'T').count();
 
         // also shifted synthesis
         let u_approx = gridsynth(config, PhaseMode::Shifted);
         let gates_shifted = decompose_domega_unitary(u_approx);
+        let t_count_shifted = gates_shifted.chars().filter(|&c| c == 'T').count();
 
-        if gates_exact.len() <= gates_shifted.len() {
+        if t_count_exact <= t_count_shifted {
             let (error, is_correct) = match config.compute_error {
                 true => {
                     let (e, is_ok) = compute_error(
