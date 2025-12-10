@@ -161,6 +161,6 @@ fn test_low_precision_bug() {
     let theta = pi / 2.0;
     let epsilon = 1e-1;
     let verbose = false;
-    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, 1234, verbose);
+    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, 1234, verbose, false);
     gridsynth_gates(&mut gridsynth_config);
 }
