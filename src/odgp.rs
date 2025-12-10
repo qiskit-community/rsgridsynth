@@ -47,63 +47,66 @@ fn solve_odgp_internal(i: Interval, j: Interval) -> Box<dyn Iterator<Item = ZRoo
         return Box::new(solve_odgp_internal(j, i).map(|beta| beta.conj_sq2()));
     }
 
+    // Compute the scaling factor LAMBDA^n
     let n = if j.width() <= bfzero {
         IBig::ZERO
     } else {
         floorlog(j.width(), LAMBDA.to_real()).0
     };
 
-    if n == IBig::ZERO {
-        let sum_min = &i.l + &j.l;
-        let div_min: FBig<HalfEven> = sum_min / 2;
-        let a_min: IBig = div_min.ceil().try_into().unwrap();
+    let lambda_n = LAMBDA.pow(&n);
+    let lambda_inv_n = LAMBDA.pow(&(-&n));
+    let lambda_n_f = lambda_n.to_real();
 
-        let sum_max = &i.r + &j.r;
-        let div_max: FBig<HalfEven> = sum_max / 2;
-        let a_max = div_max.floor().try_into().unwrap();
+    let lambda_conj_sq2_n = LAMBDA.conj_sq2().pow(&n);
+    let lambda_conj_sq2_n_f = lambda_conj_sq2_n.to_real();
 
-        let sol_iter = iter::successors(Some(a_min.clone()), move |a| {
-            let mut a_next = a.clone();
-            a_next += 1;
-            if a_next <= a_max {
-                Some(a_next)
+    // Here we replace the intervals (i, j) by their scaled versions
+    // (avoiding an extra recursion).
+    let i = i.scale(&lambda_n_f);
+    let j = j.scale(&lambda_conj_sq2_n_f);
+
+    let sum_min = &i.l + &j.l;
+    let div_min: FBig<HalfEven> = sum_min / 2;
+    let a_min: IBig = div_min.ceil().try_into().unwrap();
+
+    let sum_max = &i.r + &j.r;
+    let div_max: FBig<HalfEven> = sum_max / 2;
+    let a_max = div_max.floor().try_into().unwrap();
+
+    let sol_iter = iter::successors(Some(a_min.clone()), move |a| {
+        let mut a_next = a.clone();
+        a_next += 1;
+        if a_next <= a_max {
+            Some(a_next)
+        } else {
+            None
+        }
+    })
+    .flat_map(move |a| {
+        let a_real = ib_to_bf_prec(a.clone()); // 明示的に clone して消費
+        let tmp1: FBig<HalfEven> = sqrt2() * (&a_real - &j.r) / 2;
+        let b_min: IBig = tmp1.ceil().try_into().unwrap();
+
+        let tmp2: FBig<HalfEven> = sqrt2() * (&a_real - &j.l) / 2;
+        let b_max: IBig = tmp2.floor().try_into().unwrap();
+
+        iter::successors(Some(b_min.clone()), move |b| {
+            let mut b_next = b.clone();
+            b_next += 1;
+            if b_next <= b_max {
+                Some(b_next)
             } else {
                 None
             }
         })
-        .flat_map(move |a| {
-            let a_real = ib_to_bf_prec(a.clone()); // 明示的に clone して消費
-            let tmp1: FBig<HalfEven> = sqrt2() * (&a_real - &j.r) / 2;
-            let b_min: IBig = tmp1.ceil().try_into().unwrap();
+        .map({
+            let value = lambda_inv_n.clone();
+            move |b| ZRootTwo::new(a.clone(), b.clone()) * &value
+        })
+    });
 
-            let tmp2: FBig<HalfEven> = sqrt2() * (&a_real - &j.l) / 2;
-            let b_max: IBig = tmp2.floor().try_into().unwrap();
-
-            iter::successors(Some(b_min.clone()), move |b| {
-                let mut b_next = b.clone();
-                b_next += 1;
-                if b_next <= b_max {
-                    Some(b_next)
-                } else {
-                    None
-                }
-            })
-            .map(move |b| ZRootTwo::new(a.clone(), b.clone()))
-        });
-
-        return Box::new(sol_iter);
-    }
-
-    let lambda_n = LAMBDA.pow(&n);
-    let lambda_inv_n = LAMBDA.pow(&(-&n));
-
-    let lambda_conj_sq2_n = LAMBDA.conj_sq2().pow(&n);
-
-    let lambda_n_f = lambda_n.to_real();
-    let lambda_conj_sq2_n_f = lambda_conj_sq2_n.to_real();
-    let scaled_i = i.scale(&lambda_n_f);
-    let scaled_j = j.scale(&lambda_conj_sq2_n_f);
-    Box::new(solve_odgp_internal(scaled_i, scaled_j).map(move |beta| beta * lambda_inv_n.clone()))
+    Box::new(sol_iter)
 }
 
 pub fn solve_odgp_with_parity(

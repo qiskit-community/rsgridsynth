@@ -246,6 +246,16 @@ impl Mul for ZRootTwo {
     }
 }
 
+impl Mul<&ZRootTwo> for ZRootTwo {
+    type Output = ZRootTwo;
+
+    fn mul(self, other: &ZRootTwo) -> ZRootTwo {
+        let a = &self.a * &other.a + 2 * &self.b * &other.b;
+        let b = &self.a * &other.b + &self.b * &other.a;
+        ZRootTwo::new(a, b)
+    }
+}
+
 impl Mul<&ZRootTwo> for &ZRootTwo {
     type Output = ZRootTwo;
     fn mul(self, other: &ZRootTwo) -> ZRootTwo {
