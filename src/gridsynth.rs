@@ -51,8 +51,8 @@ fn matrix_multiply_2x2(
 // If we don't care about phase, then it is enough to check both `U` and `exp(i pi/8) U`.
 //
 // To synthesize up to a phase, we run both `PhaseMode::Exact` and
-// `PhaseMode::Shifted` and keep the one with lower T count. (We don't compute the best
-// exact solution and then the best with the phase factor. Rather we interleave candidates
+// `PhaseMode::Shifted` and keep the one with lower T count. We first compute the best
+// exact solution and then the best with the phase factor. An optimization would be to  interleave candidates
 // from each to avoid doing more work than necessary.
 //
 // The following comments assume we are checking `exp(i pi/8) U`.
