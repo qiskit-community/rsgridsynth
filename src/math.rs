@@ -147,13 +147,15 @@ pub fn solve_quadratic(
     c: &FBig<HalfEven>,
 ) -> Option<(FBig<HalfEven>, FBig<HalfEven>)> {
     let zero = ib_to_bf_prec(IBig::ZERO);
-    let two  = ib_to_bf_prec(IBig::from(2));
+    let two = ib_to_bf_prec(IBig::from(2));
     let four = ib_to_bf_prec(IBig::from(4));
 
     // Handle degenerate and easy cases
     if a == &zero {
         // Linear: b x + c = 0
-        if b == &zero { return None; }
+        if b == &zero {
+            return None;
+        }
         let x = -c.clone() / b.clone();
         return Some((x.clone(), x));
     }
@@ -164,7 +166,9 @@ pub fn solve_quadratic(
 
     // Discriminant
     let disc = b.clone() * b.clone() - four.clone() * a.clone() * c.clone();
-    if disc < zero { return None; }
+    if disc < zero {
+        return None;
+    }
     let sqrt_d = disc.sqrt();
 
     // Stable computation:

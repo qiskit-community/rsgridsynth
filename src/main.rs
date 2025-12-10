@@ -120,11 +120,7 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
     } else {
         calculated_prec_bits
     };
-    let prec_bits = if prec_bits < 16 {
-        16
-    } else {
-        prec_bits
-    };
+    let prec_bits = if prec_bits < 16 { 16 } else { prec_bits };
     set_prec_bits(prec_bits);
     let epsilon = ib_to_bf_prec(epsilon_num) / ib_to_bf_prec(epsilon_den);
     let diophantine_timeout = matches
