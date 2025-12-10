@@ -154,28 +154,46 @@ pub fn solve_quadratic(
     b: &FBig<HalfEven>,
     c: &FBig<HalfEven>,
 ) -> Option<(FBig<HalfEven>, FBig<HalfEven>)> {
-    let (a_norm, b_norm, c_norm) = if a < &ib_to_bf_prec(IBig::ZERO) {
-        (-a, -b, -c)
-    } else {
-        (a.clone(), b.clone(), c.clone())
-    };
+    let zero = ib_to_bf_prec(IBig::ZERO);
+    let two = ib_to_bf_prec(IBig::from(2));
+    let four = ib_to_bf_prec(IBig::from(4));
 
-    let discriminant: FBig<HalfEven> = &b_norm * &b_norm - 4 * &a_norm * &c_norm;
-    if discriminant < ib_to_bf_prec(IBig::ZERO) {
-        return None;
+    // Handle degenerate and easy cases
+    if a == &zero {
+        // Linear: b x + c = 0
+        if b == &zero {
+            return None;
+        }
+        let x = -c.clone() / b.clone();
+        return Some((x.clone(), x));
+    }
+    if c == &zero {
+        // Roots are 0 and -b/a; avoids 0/0 in the stable branch
+        return Some((zero.clone(), -b.clone() / a.clone()));
     }
 
-    let sqrt_discriminant = discriminant.sqrt();
-    let neg_b = -b_norm.clone();
-    let s1 = &neg_b - &sqrt_discriminant;
-    let s2 = &neg_b + &sqrt_discriminant;
+    // Discriminant
+    let disc = b.clone() * b.clone() - four.clone() * a.clone() * c.clone();
+    if disc < zero {
+        return None;
+    }
+    let sqrt_d = disc.sqrt();
 
-    let tol = ib_to_bf_prec(IBig::ZERO);
-    if b_norm >= tol {
-        Some((s1 / (2 * &a_norm), s2 / (2 * &a_norm)))
-    } else if -tol.clone() < c_norm && c_norm < tol.clone() {
-        Some((FBig::from(0), -b_norm / a_norm))
+    // Stable computation:
+    // s = -b - sign(b) * sqrt(d)
+    // x1 = s / (2a), x2 = (2c) / s
+    let s = if b >= &zero {
+        -b.clone() - sqrt_d.clone()
     } else {
-        Some(((2 * &c_norm) / &s2, (2 * &c_norm) / &s1))
+        -b.clone() + sqrt_d.clone()
+    };
+
+    // s == 0 can only happen when c == 0 (handled above), so safe here
+    let x1 = s.clone() / (two.clone() * a.clone());
+    let x2 = (two * c.clone()) / s;
+    if b >= &zero {
+        Some((x1, x2))
+    } else {
+        Some((x2, x1))
     }
 }

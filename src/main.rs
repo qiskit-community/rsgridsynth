@@ -116,7 +116,6 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
     let theta = ib_to_bf_prec(theta_num) / ib_to_bf_prec(theta_den);
     let epsilon_str = matches.get_one::<String>("epsilon").unwrap();
     let (epsilon_num, epsilon_den) = parse_decimal_with_exponent(epsilon_str).unwrap();
-
     let dps: Option<u32> = matches
         .get_one::<String>("dps")
         .and_then(|s| s.parse().ok());
@@ -128,6 +127,7 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
     } else {
         calculated_prec_bits
     };
+    let prec_bits = if prec_bits < 16 { 16 } else { prec_bits };
     set_prec_bits(prec_bits);
     let epsilon = ib_to_bf_prec(epsilon_num) / ib_to_bf_prec(epsilon_den);
     let diophantine_timeout = matches
