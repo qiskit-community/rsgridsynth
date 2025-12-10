@@ -96,3 +96,14 @@ fn test_correct_decomposition() {
         assert!(res.is_correct.is_some_and(|v| v));
     }
 }
+
+#[test]
+#[serial]
+fn test_low_precision_bug() {
+    let pi = std::f64::consts::PI;
+    let theta = pi / 2.0;
+    let epsilon = 1e-1;
+    let verbose = false;
+    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, 1234, verbose);
+    gridsynth_gates(&mut gridsynth_config);
+}

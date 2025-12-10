@@ -112,6 +112,13 @@ pub fn config_from_theta_epsilon(
     let calculated_prec_bits =
         12 * (epsilon_den.ilog(&UBig::from(10u8)) - epsilon_num.ilog(&UBig::from(10u8)));
     let prec_bits: usize = calculated_prec_bits;
+    // Using precision that is too low can cause errors. For example stack overflow and sigabrt.
+    // We don't actually need our target precision tied to working precision.
+    let prec_bits = if prec_bits < 16 {
+        16
+    } else {
+        prec_bits
+    };
     set_prec_bits(prec_bits);
     let epsilon = ib_to_bf_prec(epsilon_num) / ib_to_bf_prec(epsilon_den);
     let diophantine_timeout = 200u128;
