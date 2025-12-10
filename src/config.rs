@@ -20,6 +20,7 @@ pub struct GridSynthConfig {
     pub verbose: bool,
     pub measure_time: bool,
     pub diophantine_data: DiophantineData,
+    pub up_to_phase: bool,
     pub compute_error: bool,
 }
 
@@ -38,10 +39,13 @@ pub struct GridSynthResult {
     /// List of gates.
     pub gates: String,
 
-    // /// The global phase factor.
-    // pub global_phase: bool,
+    /// The global phase factor.
+    pub global_phase: bool,
+
+    /// If error is computed, stores the error.
     pub error: Option<f64>,
-    /// If correctness is performed, stores the result.
+
+    /// If error is computed, stores whether approximation is correct.
     pub is_correct: Option<bool>,
 }
 
@@ -98,6 +102,7 @@ pub fn config_from_theta_epsilon(
     epsilon: f64,
     seed: u64,
     verbose: bool,
+    up_to_phase: bool,
 ) -> GridSynthConfig {
     let (theta_num, theta_den) = parse_decimal_with_exponent(&theta.to_string()).unwrap();
 
@@ -134,6 +139,7 @@ pub fn config_from_theta_epsilon(
         verbose,
         measure_time: time,
         diophantine_data,
+        up_to_phase,
         compute_error: false,
     }
 }

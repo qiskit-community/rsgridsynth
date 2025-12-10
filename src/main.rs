@@ -96,6 +96,13 @@ fn build_command() -> Command {
                 .short('g')
                 .action(clap::ArgAction::SetTrue),
         )
+        // We use `phase` rather than, say, `up_to_phase` to agree with original gridsynth.
+        .arg(
+            Arg::new("phase")
+                .long("phase")
+                .short('p')
+                .action(clap::ArgAction::SetTrue),
+        )
         .arg(
             Arg::new("error")
                 .long("error")
@@ -135,6 +142,7 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         .unwrap();
     let verbose = matches.get_flag("verbose");
     let measure_time = matches.get_flag("time");
+    let up_to_phase = matches.get_flag("phase");
     let compute_error = matches.get_flag("error");
 
     let seed = matches.get_one::<String>("seed").unwrap().parse().unwrap();
@@ -151,6 +159,7 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         verbose,
         measure_time,
         diophantine_data,
+        up_to_phase,
         compute_error,
     }
 }

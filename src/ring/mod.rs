@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
 mod d_omega;
-mod d_root_two;
+pub mod d_root_two;
 mod z_omega;
 pub mod z_root_two;
 

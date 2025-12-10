@@ -17,8 +17,10 @@ fn main() {
     let theta = pi / 8.0;
     let epsilon = 1e-10;
     let seed = 1234;
+    let up_to_phase = false;
     let verbose = false;
-    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed, verbose);
+    let mut gridsynth_config =
+        config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
     let res = gridsynth_gates(&mut gridsynth_config);
     println!("{}", res.gates);
 }

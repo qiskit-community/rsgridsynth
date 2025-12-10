@@ -5,16 +5,17 @@ use crate::common::{cos_fbig, fb_with_prec, get_prec_bits, ib_to_bf_prec, sin_fb
 use crate::config::{GridSynthConfig, GridSynthResult};
 use crate::diophantine::diophantine_dyadic;
 use crate::math::solve_quadratic;
+use crate::math::sqrt_fbig;
 use crate::region::Ellipse;
-use crate::ring::{DOmega, DRootTwo};
+use crate::ring::{DOmega, DRootTwo, ZOmega, ZRootTwo};
 use crate::synthesis_of_clifford_t::decompose_domega_unitary;
 use crate::tdgp::solve_tdgp;
 use crate::tdgp::Region;
 use crate::to_upright::to_upright_set_pair;
 use crate::unitary::DOmegaUnitary;
 use dashu_base::{Approximation, SquareRoot};
-use dashu_float::round::mode::{self, HalfEven};
-use dashu_float::{Context, FBig};
+use dashu_float::round::mode::HalfEven;
+use dashu_float::FBig;
 use dashu_int::IBig;
 
 //use log::{debug, info};
@@ -44,6 +45,34 @@ fn matrix_multiply_2x2(
     result
 }
 
+// PhaseMode::Exact synthesize gate including exact phase
+// PhaseMode::Shifted synthesize gate with a fixed phase factor of `exp(i pi/8)`
+
+// If we don't care about phase, then it is enough to check both `U` and `exp(i pi/8) U`.
+//
+// To synthesize up to a phase, we run both `PhaseMode::Exact` and
+// `PhaseMode::Shifted` and keep the one with lower T count. We first compute the best
+// exact solution and then the best with the phase factor. An optimization would be to  interleave candidates
+// from each to avoid doing more work than necessary.
+//
+// The following comments assume we are checking `exp(i pi/8) U`.
+// The pair 2 ± √2 enter in some places as scale factors.
+//
+// omega = exp(-i pi/4)
+// delta = 1 + omega
+// |delta|^2 = 2 + 2cos(pi/4) = 2 + √2
+// From Lemma 9.6 in R + S, we must scale the epsilon region by
+// |delta| = √(2 + √2)
+//
+// We scale the UnitDisk by the root-2 conjugate of |delta|:
+// |delta^●| = √(2 - √2)
+// See Algorithm 9.8, page 20 of R+S.
+#[derive(Debug, Clone, Copy)]
+pub enum PhaseMode {
+    Exact,   // no scaling
+    Shifted, // do scaling
+}
+
 fn rotation_mat(theta: &FBig<HalfEven>) -> Matrix2<Complex<FBig<HalfEven>>> {
     let two = fb_with_prec(FBig::try_from(2.0).unwrap());
     let theta_half = fb_with_prec(theta / &two);
@@ -61,14 +90,42 @@ fn rotation_mat(theta: &FBig<HalfEven>) -> Matrix2<Complex<FBig<HalfEven>>> {
     )
 }
 
+fn mult_complex_nums(
+    u: &Complex<FBig<HalfEven>>,
+    v: &Complex<FBig<HalfEven>>,
+) -> Complex<FBig<HalfEven>> {
+    let re = &u.re * &v.re - &u.im * &v.im;
+    let im = &u.re * &v.im + &u.im * &v.re;
+    Complex::new(re, im)
+}
+
+fn to_fbig(x: f64) -> FBig<HalfEven> {
+    FBig::<HalfEven>::try_from(x)
+        .unwrap()
+        .with_precision(get_prec_bits())
+        .value()
+}
+
 /// Checks correctness of the synthesized circuit.
-fn compute_error(gates: &str, theta: &FBig<HalfEven>, epsilon: &FBig<HalfEven>) -> (f64, bool) {
+fn compute_error(
+    gates: &str,
+    theta: &FBig<HalfEven>,
+    epsilon: &FBig<HalfEven>,
+    phase: PhaseMode,
+) -> (f64, bool) {
     let expected = rotation_mat(theta);
     let synthesized = DOmegaUnitary::from_gates(gates).to_complex_matrix();
 
     // x = e^{-i theta / 2}
     let x = expected[(0, 0)].clone();
-    let u = synthesized[(0, 0)].clone();
+    let u = match phase {
+        PhaseMode::Exact => synthesized[(0, 0)].clone(),
+        PhaseMode::Shifted => {
+            let p = to_fbig(std::f64::consts::PI / 8.);
+            let phase = Complex::new(cos_fbig(&p), sin_fbig(&p));
+            mult_complex_nums(&synthesized[(0, 0)].clone(), &phase)
+        }
+    };
 
     // This computes the eigenvalues of A^* A, where A = expected - synthesized.
     // The operator norm is the square root of this.
@@ -92,6 +149,7 @@ fn compute_error(gates: &str, theta: &FBig<HalfEven>, epsilon: &FBig<HalfEven>) 
 pub struct EpsilonRegion {
     _theta: FBig<HalfEven>,
     _epsilon: FBig<HalfEven>,
+    scale: ZRootTwo,
     d: FBig<HalfEven>,
     z_x: FBig<HalfEven>,
     z_y: FBig<HalfEven>,
@@ -99,14 +157,16 @@ pub struct EpsilonRegion {
 }
 
 impl EpsilonRegion {
-    pub fn new(theta: FBig<HalfEven>, epsilon: FBig<HalfEven>) -> Self {
-        let ctx: Context<mode::HalfEven> = Context::<mode::HalfEven>::new(get_prec_bits());
+    pub fn new(theta: FBig<HalfEven>, epsilon: FBig<HalfEven>, scale: ZRootTwo) -> Self {
         let one = fb_with_prec(FBig::try_from(1.0).unwrap());
         let two = fb_with_prec(FBig::try_from(2.0).unwrap());
         let four = fb_with_prec(FBig::try_from(4.0).unwrap());
         let epsilon_squared = fb_with_prec(&epsilon * &epsilon);
         let half_eps_sq = fb_with_prec(&epsilon_squared / &four);
-        let d = fb_with_prec(ctx.sqrt((one - half_eps_sq).repr()).value());
+        let one_minus_half_eps_sq = one - half_eps_sq;
+        let scale_to_real = scale.to_real();
+        let d = fb_with_prec(sqrt_fbig(&one_minus_half_eps_sq) * sqrt_fbig(&scale_to_real));
+
         let theta_half = fb_with_prec(&theta / &two);
         let neg_theta_half = -fb_with_prec(theta_half);
         let z_x: FBig<HalfEven> = fb_with_prec(cos_fbig(&neg_theta_half));
@@ -118,10 +178,10 @@ impl EpsilonRegion {
         let d1: Matrix2<FBig<HalfEven>> =
             Matrix2::new(z_x.clone(), neg_z_y.clone(), z_y.clone(), z_x.clone());
         let d2: Matrix2<FBig<HalfEven>> = Matrix2::new(
-            64 * epsilon_neg4,
+            fb_with_prec(64 * epsilon_neg4 / &scale_to_real),
             zero.clone(),
             zero.clone(),
-            4 * epsilon_neg2,
+            fb_with_prec(4 * epsilon_neg2 / &scale_to_real),
         );
         let d3: Matrix2<FBig<HalfEven>> =
             Matrix2::new(z_x.clone(), z_y.clone(), neg_z_y, z_x.clone());
@@ -134,6 +194,7 @@ impl EpsilonRegion {
         Self {
             _theta: theta,
             _epsilon: epsilon,
+            scale,
             d,
             z_x,
             z_y,
@@ -146,18 +207,23 @@ impl Region for EpsilonRegion {
     fn ellipse(&self) -> Ellipse {
         self.ellipse.clone()
     }
+
+    // Return true if `u` is inside shaded region in figure in eq (14) in R + S
+    // The radius is 1 in the figure.
+    // For "up to phase" it is scaled by |δ|^2 = 2 + √2.
     fn inside(&self, u: &DOmega) -> bool {
         let cos_term1 = fb_with_prec(&self.z_x * u.real());
         let cos_term2 = fb_with_prec(&self.z_y * u.imag());
         let cos_similarity = fb_with_prec(&cos_term1 + &cos_term2);
-        DRootTwo::from_domega(u.conj() * u) <= DRootTwo::from_int(IBig::ONE)
+
+        DRootTwo::from_domega(u.conj() * u) <= DRootTwo::from_zroottwo(self.scale.clone())
             && cos_similarity >= self.d
     }
 
     fn intersect(&self, u0: &DOmega, v: &DOmega) -> Option<(FBig<HalfEven>, FBig<HalfEven>)> {
         let a = v.conj() * v;
         let b = 2 * (v.conj() * u0);
-        let c = u0.conj() * u0 - DOmega::from_int(IBig::ONE);
+        let c = u0.conj() * u0 - DOmega::from_zroottwo(&self.scale);
         let vz_term1 = fb_with_prec(&self.z_x * v.real());
         let vz_term2 = fb_with_prec(&self.z_y * v.imag());
         let vz = fb_with_prec(&vz_term1 + &vz_term2);
@@ -186,30 +252,26 @@ impl Region for EpsilonRegion {
 
 #[derive(Debug)]
 pub struct UnitDisk {
+    scale: ZRootTwo,
     ellipse: Ellipse,
 }
 
 impl UnitDisk {
-    pub fn new() -> Self {
+    pub fn new(scale: ZRootTwo) -> Self {
+        let s_inv: FBig<HalfEven> = 1 / scale.to_real();
         let ellipse = Ellipse::from(
-            ib_to_bf_prec(IBig::ONE),
+            s_inv.clone(),
             ib_to_bf_prec(IBig::ZERO),
             ib_to_bf_prec(IBig::ZERO),
-            ib_to_bf_prec(IBig::ONE),
+            s_inv.clone(),
             ib_to_bf_prec(IBig::ZERO),
             ib_to_bf_prec(IBig::ZERO),
         );
-        Self { ellipse }
+        Self { scale, ellipse }
     }
 
     pub fn ellipse(&self) -> &Ellipse {
         &self.ellipse
-    }
-}
-
-impl Default for UnitDisk {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -218,35 +280,52 @@ impl Region for UnitDisk {
         self.ellipse.clone()
     }
     fn inside(&self, u: &DOmega) -> bool {
-        DRootTwo::from_domega(u.conj() * u) <= DRootTwo::from_int(IBig::ONE)
+        DRootTwo::from_domega(u.conj() * u) <= DRootTwo::from_zroottwo(self.scale.clone())
     }
 
     fn intersect(&self, u0: &DOmega, v: &DOmega) -> Option<(FBig<HalfEven>, FBig<HalfEven>)> {
         let a = v.conj() * v;
         let b = 2 * (v.conj() * u0);
-        let c = u0.conj() * u0 - IBig::ONE;
+        let c = u0.conj() * u0 - DOmega::from_zroottwo(&self.scale);
         solve_quadratic(a.real(), b.real(), c.real())
     }
 }
 
-fn process_solution_candidate(mut z: DOmega, mut w_val: DOmega) -> DOmegaUnitary {
+fn process_solution_candidate(mut z: DOmega, mut w: DOmega, phase: PhaseMode) -> DOmegaUnitary {
     z = z.reduce_denomexp();
-    w_val = w_val.reduce_denomexp();
+    w = w.reduce_denomexp();
 
-    match z.k.cmp(&w_val.k) {
+    match z.k.cmp(&w.k) {
         Ordering::Greater => {
-            w_val = w_val.renew_denomexp(z.k);
+            w = w.renew_denomexp(z.k);
         }
         Ordering::Less => {
-            z = z.renew_denomexp(w_val.k);
+            z = z.renew_denomexp(w.k);
         }
         Ordering::Equal => {}
     }
 
-    if (z.clone() + w_val.clone()).reduce_denomexp().k < z.k {
-        DOmegaUnitary::new(z, w_val, 0, None)
-    } else {
-        DOmegaUnitary::new(z, w_val.mul_by_omega(), 0, None)
+    match phase {
+        // Question: this is a bit different from pygridsynth
+        PhaseMode::Exact => {
+            if (z.clone() + w.clone()).reduce_denomexp().k < z.k {
+                DOmegaUnitary::new(z, w, 0, None)
+            } else {
+                DOmegaUnitary::new(z, w.mul_by_omega(), 0, None)
+            }
+        }
+        PhaseMode::Shifted => {
+            // todo: remove clones
+            let k1 = (z.clone() + w.clone()).reduce_denomexp().k;
+            let k2 = (z.clone() + w.mul_by_omega()).reduce_denomexp().k;
+            let k3 = (z.clone() + w.mul_by_omega_inv()).reduce_denomexp().k;
+
+            if k1 <= k2.min(k3) {
+                DOmegaUnitary::new(z, w, 7, None)
+            } else {
+                DOmegaUnitary::new(z, w.mul_by_omega_inv(), 7, None)
+            }
+        }
     }
 }
 
@@ -254,6 +333,7 @@ fn process_solutions<I>(
     config: &mut GridSynthConfig,
     solutions: I,
     time_of_diophantine_dyadic: &mut Duration,
+    phase: PhaseMode,
 ) -> Option<DOmegaUnitary>
 where
     I: Iterator<Item = DOmega>,
@@ -269,7 +349,19 @@ where
             continue;
         }
 
-        let xi = DRootTwo::from_int(IBig::ONE) - DRootTwo::from_domega(z.conj() * &z);
+        let z_with_phase = match phase {
+            PhaseMode::Exact => z.clone(),
+            // todo: make constant
+            PhaseMode::Shifted => {
+                &z * &DOmega::new(
+                    ZOmega::new(IBig::from(0), IBig::from(-1), IBig::from(1), IBig::from(0)),
+                    1,
+                )
+            }
+        };
+
+        let xi = DRootTwo::from_int(IBig::ONE)
+            - DRootTwo::from_domega(z_with_phase.conj() * &z_with_phase);
         if let Some(w_val) = diophantine_dyadic(xi, &mut config.diophantine_data) {
             if let Some(start) = start_diophantine {
                 *time_of_diophantine_dyadic += start.elapsed();
@@ -283,7 +375,7 @@ where
             if config.verbose {
                 debug!("------------------");
             }
-            return Some(process_solution_candidate(z, w_val));
+            return Some(process_solution_candidate(z_with_phase, w_val, phase));
         }
     }
 
@@ -298,6 +390,7 @@ fn setup_regions_and_transform(
     epsilon: FBig<HalfEven>,
     verbose: bool,
     measure_time: bool,
+    phase: PhaseMode,
 ) -> (
     EpsilonRegion,
     UnitDisk,
@@ -309,8 +402,30 @@ fn setup_regions_and_transform(
         crate::region::Rectangle,
     ),
 ) {
-    let epsilon_region = EpsilonRegion::new(theta, epsilon);
-    let unit_disk = UnitDisk::new();
+    let epsilon_region_scale = match phase {
+        PhaseMode::Exact => ZRootTwo {
+            a: IBig::from(1),
+            b: IBig::from(0),
+        },
+        PhaseMode::Shifted => ZRootTwo {
+            a: IBig::from(2),
+            b: IBig::from(1),
+        },
+    };
+
+    let unit_disk_scale = match phase {
+        PhaseMode::Exact => ZRootTwo {
+            a: IBig::from(1),
+            b: IBig::from(0),
+        },
+        PhaseMode::Shifted => ZRootTwo {
+            a: IBig::from(2),
+            b: IBig::from(-1),
+        },
+    };
+
+    let epsilon_region = EpsilonRegion::new(theta, epsilon, epsilon_region_scale);
+    let unit_disk = UnitDisk::new(unit_disk_scale);
 
     let start_upright = if measure_time {
         Some(Instant::now())
@@ -345,6 +460,7 @@ fn search_for_solution(
         crate::region::Rectangle,
     ),
     config: &mut GridSynthConfig,
+    phase: PhaseMode,
 ) -> DOmegaUnitary {
     let mut k = 0;
     let mut time_of_solve_tdgp = Duration::ZERO;
@@ -379,7 +495,7 @@ fn search_for_solution(
         }
         if let Some(solutions) = solutions {
             if let Some(result) =
-                process_solutions(config, solutions, &mut time_of_diophantine_dyadic)
+                process_solutions(config, solutions, &mut time_of_diophantine_dyadic, phase)
             {
                 if config.measure_time {
                     debug!(
@@ -406,61 +522,103 @@ fn search_for_solution(
 ///
 /// # Returns
 /// A DOmegaUnitary representing the optimal Clifford+T approximation
-fn gridsynth(config: &mut GridSynthConfig) -> DOmegaUnitary {
+fn gridsynth(config: &mut GridSynthConfig, phase: PhaseMode) -> DOmegaUnitary {
     let (epsilon_region, unit_disk, transformed) = setup_regions_and_transform(
         config.theta.clone(),
         config.epsilon.clone(),
         config.verbose,
         config.measure_time,
+        phase,
     );
 
-    search_for_solution(&epsilon_region, &unit_disk, &transformed, config)
+    search_for_solution(&epsilon_region, &unit_disk, &transformed, config, phase)
 }
 
 pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
-    let start_total = if config.measure_time {
-        Some(Instant::now())
-    } else {
-        None
-    };
+    // let start_total = if config.measure_time {
+    //     Some(Instant::now())
+    // } else {
+    //     None
+    // };
 
-    let u_approx = gridsynth(config);
+    // let start_decompose = if config.measure_time {
+    //     Some(Instant::now())
+    // } else {
+    //     None
+    // };
 
-    let start_decompose = if config.measure_time {
-        Some(Instant::now())
-    } else {
-        None
-    };
-    let gates = decompose_domega_unitary(u_approx);
+    if !config.up_to_phase {
+        // exact synthesis only
+        let u_approx = gridsynth(config, PhaseMode::Exact);
+        let gates = decompose_domega_unitary(u_approx);
 
-    if let Some(start) = start_decompose {
-        if config.measure_time {
-            debug!(
-                "time of decompose_domega_unitary: {:.3} ms",
-                start.elapsed().as_secs_f64() * 1000.0
-            );
+        // Perform validation check, if required.
+        let (error, is_correct) = match config.compute_error {
+            true => {
+                let (e, is_ok) =
+                    compute_error(&gates, &config.theta, &config.epsilon, PhaseMode::Exact);
+                (Some(e), Some(is_ok))
+            }
+            false => (None, None),
+        };
+
+        GridSynthResult {
+            gates,
+            global_phase: false,
+            error,
+            is_correct,
         }
-    }
-    if let Some(start) = start_total {
-        if config.measure_time {
-            debug!(
-                "total time: {:.3} ms",
-                start.elapsed().as_secs_f64() * 1000.0
-            );
-        }
-    }
-
-    // Peform validation check, if required.
-    let (error, is_correct) = if config.compute_error {
-        let (error, is_correct) = compute_error(&gates, &config.theta, &config.epsilon);
-        (Some(error), Some(is_correct))
     } else {
-        (None, None)
-    };
+        // exact synthesis
+        let u_approx = gridsynth(config, PhaseMode::Exact);
+        let gates_exact = decompose_domega_unitary(u_approx);
+        let t_count_exact = gates_exact.chars().filter(|&c| c == 'T').count();
 
-    GridSynthResult {
-        gates,
-        error,
-        is_correct,
+        // also shifted synthesis
+        let u_approx = gridsynth(config, PhaseMode::Shifted);
+        let gates_shifted = decompose_domega_unitary(u_approx);
+        let t_count_shifted = gates_shifted.chars().filter(|&c| c == 'T').count();
+
+        if t_count_exact <= t_count_shifted {
+            let (error, is_correct) = match config.compute_error {
+                true => {
+                    let (e, is_ok) = compute_error(
+                        &gates_exact,
+                        &config.theta,
+                        &config.epsilon,
+                        PhaseMode::Exact,
+                    );
+                    (Some(e), Some(is_ok))
+                }
+                false => (None, None),
+            };
+
+            GridSynthResult {
+                gates: gates_exact,
+                global_phase: false,
+                error,
+                is_correct,
+            }
+        } else {
+            let (error, is_correct) = match config.compute_error {
+                true => {
+                    let (e, is_ok) = compute_error(
+                        &gates_shifted,
+                        &config.theta,
+                        &config.epsilon,
+                        PhaseMode::Shifted,
+                    );
+                    (Some(e), Some(is_ok))
+                }
+                false => (None, None),
+            };
+
+            GridSynthResult {
+                gates: gates_shifted,
+                global_phase: true,
+                error,
+                is_correct,
+            }
+        }
     }
 }

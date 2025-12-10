@@ -4,6 +4,7 @@
 use crate::common::ib_to_bf_prec;
 use crate::math::{floorsqrt, rounddiv, sign, sqrt2};
 use crate::ring::ZOmega;
+use dashu_base::Sign;
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::IBig;
@@ -17,6 +18,22 @@ pub struct ZRootTwo {
     pub(crate) a: IBig,
     pub(crate) b: IBig,
 }
+
+pub const ONE: ZRootTwo = ZRootTwo {
+    a: IBig::ONE,
+    b: IBig::ZERO,
+};
+
+pub const DELTA_SQUARED: ZRootTwo = ZRootTwo {
+    a: IBig::from_parts_const(Sign::Positive, 2),
+    b: IBig::ONE,
+};
+
+// // Absolute value squared of root two conjugate of δ.
+// pub const DELTA_SQUARED_M: ZRootTwo = ZRootTwo {
+//     a: IBig::from_parts_const(Sign::Positive, 2),
+//     b: IBig::NEG_ONE,
+// };
 
 // See Definition 3.5 on pg 3 of R+S for the definition of lambda (and delta)
 // Careful! There is a different, unrelated defintion of lambda in
