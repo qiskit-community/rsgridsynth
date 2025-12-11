@@ -1,6 +1,6 @@
 [package]
 name = "rsgridsynth"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 authors = ["Shun Yamamoto", "Nobuyuki Yoshioka", "IBM"]
 license = "MIT"
@@ -35,8 +35,8 @@ log = "0.4"
 env_logger = "0.11"
 
 [dev-dependencies]
-serial_test = "*"
-ntest = "*"
+serial_test = "3"
+ntest = "0.9"
 
 [profile.release]
 opt-level = 3
