@@ -27,6 +27,11 @@ use crate::config::parse_decimal_with_exponent;
 use crate::config::{DiophantineData, GridSynthConfig};
 use gridsynth::gridsynth_gates;
 
+/// Main entry point for the rsgridsynth command-line application.
+///
+/// Parses command-line arguments, configures logging based on verbosity flags,
+/// executes the gridsynth algorithm, and displays the results including
+/// optional timing information and error metrics.
 fn main() {
     let matches = build_command().get_matches();
 
@@ -60,6 +65,22 @@ fn main() {
     println!("{}", res.gates);
 }
 
+/// Builds and configures the command-line interface using clap.
+///
+/// # Returns
+///
+/// A configured `Command` instance with all supported arguments and flags:
+/// - `theta`: Required rotation angle parameter
+/// - `epsilon`: Required precision/error tolerance
+/// - `--dps`: Optional decimal precision specification
+/// - `--seed/-s`: Random seed (default: 1)
+/// - `--dtimeout/-d`: Diophantine solver timeout in milliseconds (default: 200)
+/// - `--ftimeout/-f`: Factoring timeout in milliseconds (default: 50)
+/// - `--verbose/-v`: Enable verbose logging
+/// - `--time/-t`: Measure and display execution time
+/// - `--showgraph/-g`: Show graph visualization
+/// - `--phase/-p`: Compute up to global phase
+/// - `--error`: Compute and display approximation error
 fn build_command() -> Command {
     Command::new("rsgridsynth")
         .arg(Arg::new("theta").required(true))
@@ -110,6 +131,26 @@ fn build_command() -> Command {
         )
 }
 
+/// Parses command-line arguments into a `GridSynthConfig` structure.
+///
+/// # Arguments
+///
+/// * `matches` - Parsed command-line arguments from clap
+///
+/// # Returns
+///
+/// A `GridSynthConfig` containing:
+/// - Parsed theta and epsilon values with appropriate precision
+/// - Timeout values for diophantine and factoring operations
+/// - Verbosity and timing flags
+/// - Random number generator seeded with the provided seed
+/// - Phase and error computation flags
+///
+/// # Precision Handling
+///
+/// The function automatically calculates the required precision bits based on
+/// the epsilon value, with a minimum of 16 bits. If `--dps` is provided,
+/// it overrides the calculated precision.
 fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
     let theta_str = matches.get_one::<String>("theta").unwrap();
     let (theta_num, theta_den) = parse_decimal_with_exponent(theta_str).unwrap();

@@ -26,6 +26,16 @@ use num::Complex;
 use std::cmp::Ordering;
 use std::time::{Duration, Instant};
 
+/// Multiplies two 2×2 matrices of high-precision floating-point numbers.
+///
+/// # Arguments
+///
+/// * `a` - The first matrix
+/// * `b` - The second matrix
+///
+/// # Returns
+///
+/// The matrix product a × b.
 fn matrix_multiply_2x2(
     a: &Matrix2<FBig<HalfEven>>,
     b: &Matrix2<FBig<HalfEven>>,
@@ -73,6 +83,15 @@ pub enum PhaseMode {
     Shifted, // do scaling
 }
 
+/// Creates a rotation matrix for angle theta.
+///
+/// # Arguments
+///
+/// * `theta` - The rotation angle in radians
+///
+/// # Returns
+///
+/// A 2×2 complex matrix representing the rotation R_z(theta) = diag(e^(-iθ/2), e^(iθ/2)).
 fn rotation_mat(theta: &FBig<HalfEven>) -> Matrix2<Complex<FBig<HalfEven>>> {
     let two = fb_with_prec(FBig::try_from(2.0).unwrap());
     let theta_half = fb_with_prec(theta / &two);
@@ -90,6 +109,16 @@ fn rotation_mat(theta: &FBig<HalfEven>) -> Matrix2<Complex<FBig<HalfEven>>> {
     )
 }
 
+/// Multiplies two complex numbers with high-precision floating-point components.
+///
+/// # Arguments
+///
+/// * `u` - The first complex number
+/// * `v` - The second complex number
+///
+/// # Returns
+///
+/// The product u × v.
 fn mult_complex_nums(
     u: &Complex<FBig<HalfEven>>,
     v: &Complex<FBig<HalfEven>>,
@@ -106,7 +135,20 @@ fn to_fbig(x: f64) -> FBig<HalfEven> {
         .value()
 }
 
-/// Checks correctness of the synthesized circuit.
+/// Checks correctness of the synthesized circuit and computes approximation error.
+///
+/// # Arguments
+///
+/// * `gates` - The synthesized gate sequence as a string
+/// * `theta` - The target rotation angle
+/// * `epsilon` - The desired precision tolerance
+/// * `phase` - Whether to account for a global phase factor
+///
+/// # Returns
+///
+/// A tuple `(error, is_correct)` where:
+/// - `error` is the operator norm of the difference between target and synthesized unitaries
+/// - `is_correct` is true if the error is within the epsilon tolerance
 fn compute_error(
     gates: &str,
     theta: &FBig<HalfEven>,
@@ -145,6 +187,10 @@ fn compute_error(
     (fnorm, norm < *epsilon)
 }
 
+/// Represents the epsilon-region for the GridSynth algorithm.
+///
+/// The epsilon-region is an elliptical region in the complex plane that contains
+/// all acceptable approximations to the target unitary within the specified precision.
 #[derive(Debug)]
 pub struct EpsilonRegion {
     _theta: FBig<HalfEven>,
@@ -157,6 +203,17 @@ pub struct EpsilonRegion {
 }
 
 impl EpsilonRegion {
+    /// Creates a new epsilon-region for the given parameters.
+    ///
+    /// # Arguments
+    ///
+    /// * `theta` - The target rotation angle
+    /// * `epsilon` - The precision tolerance
+    /// * `scale` - A scaling factor from Z[√2] (depends on phase mode)
+    ///
+    /// # Returns
+    ///
+    /// A new `EpsilonRegion` with the computed ellipse parameters.
     pub fn new(theta: FBig<HalfEven>, epsilon: FBig<HalfEven>, scale: ZRootTwo) -> Self {
         let one = fb_with_prec(FBig::try_from(1.0).unwrap());
         let two = fb_with_prec(FBig::try_from(2.0).unwrap());
@@ -250,6 +307,10 @@ impl Region for EpsilonRegion {
     }
 }
 
+/// Represents a scaled unit disk in the complex plane.
+///
+/// Used as a constraint region in the GridSynth algorithm to ensure
+/// the synthesized unitary has bounded norm.
 #[derive(Debug)]
 pub struct UnitDisk {
     scale: ZRootTwo,
@@ -257,6 +318,15 @@ pub struct UnitDisk {
 }
 
 impl UnitDisk {
+    /// Creates a new scaled unit disk.
+    ///
+    /// # Arguments
+    ///
+    /// * `scale` - A scaling factor from Z[√2] (depends on phase mode)
+    ///
+    /// # Returns
+    ///
+    /// A new `UnitDisk` with the specified scaling.
     pub fn new(scale: ZRootTwo) -> Self {
         let s_inv: FBig<HalfEven> = 1 / scale.to_real();
         let ellipse = Ellipse::from(
@@ -291,6 +361,17 @@ impl Region for UnitDisk {
     }
 }
 
+/// Processes a candidate solution (z, w) into a DOmegaUnitary.
+///
+/// # Arguments
+///
+/// * `z` - The first column of the unitary matrix
+/// * `w` - The second column of the unitary matrix
+/// * `phase` - The phase mode (exact or shifted)
+///
+/// # Returns
+///
+/// A `DOmegaUnitary` with normalized denominators and optimal phase adjustment.
 fn process_solution_candidate(mut z: DOmega, mut w: DOmega, phase: PhaseMode) -> DOmegaUnitary {
     z = z.reduce_denomexp();
     w = w.reduce_denomexp();
@@ -329,6 +410,18 @@ fn process_solution_candidate(mut z: DOmega, mut w: DOmega, phase: PhaseMode) ->
     }
 }
 
+/// Processes a stream of candidate solutions, attempting to solve the Diophantine equation for each.
+///
+/// # Arguments
+///
+/// * `config` - The GridSynth configuration
+/// * `solutions` - An iterator of candidate z values
+/// * `time_of_diophantine_dyadic` - Accumulator for timing measurements
+/// * `phase` - The phase mode (exact or shifted)
+///
+/// # Returns
+///
+/// `Some(unitary)` if a valid solution is found, `None` if all candidates fail.
 fn process_solutions<I>(
     config: &mut GridSynthConfig,
     solutions: I,
@@ -385,6 +478,22 @@ where
     None
 }
 
+/// Sets up the epsilon-region and unit disk, then transforms them to upright form.
+///
+/// # Arguments
+///
+/// * `theta` - The target rotation angle
+/// * `epsilon` - The precision tolerance
+/// * `verbose` - Enable verbose output
+/// * `measure_time` - Enable timing measurements
+/// * `phase` - The phase mode (exact or shifted)
+///
+/// # Returns
+///
+/// A tuple containing:
+/// - The epsilon-region
+/// - The unit disk
+/// - The transformation result (grid operator, ellipses, and rectangles)
 fn setup_regions_and_transform(
     theta: FBig<HalfEven>,
     epsilon: FBig<HalfEven>,
@@ -449,6 +558,26 @@ fn setup_regions_and_transform(
     (epsilon_region, unit_disk, transformed)
 }
 
+/// Searches for a valid solution by iteratively increasing the T-depth k.
+///
+/// # Arguments
+///
+/// * `epsilon_region` - The epsilon-region constraint
+/// * `unit_disk` - The unit disk constraint
+/// * `transformed` - The transformed regions and grid operator
+/// * `config` - The GridSynth configuration
+/// * `phase` - The phase mode (exact or shifted)
+///
+/// # Returns
+///
+/// A `DOmegaUnitary` representing the found solution.
+///
+/// # Algorithm
+///
+/// Iteratively increases k (T-depth) until a valid solution is found by:
+/// 1. Solving the TDGP to get candidate z values
+/// 2. For each candidate, solving the Diophantine equation to find w
+/// 3. Returning the first valid (z, w) pair
 fn search_for_solution(
     epsilon_region: &EpsilonRegion,
     unit_disk: &UnitDisk,
@@ -510,18 +639,22 @@ fn search_for_solution(
     }
 }
 
-/// Core gridsynth algorithm that finds an optimal Clifford+T approximation.
+/// Core GridSynth algorithm that finds an optimal Clifford+T approximation.
 ///
 /// # Arguments
-/// * `theta` - The rotation angle to approximate
-/// * `epsilon` - The approximation tolerance
-/// * `diophantine_timeout` - Timeout for diophantine equation solving (ms)
-/// * `factoring_timeout` - Timeout for integer factoring (ms)
-/// * `verbose` - Enable verbose output
-/// * `measure_time` - Enable timing measurements
+///
+/// * `config` - The GridSynth configuration containing theta, epsilon, and other parameters
+/// * `phase` - The phase mode (exact or shifted by exp(iπ/8))
 ///
 /// # Returns
-/// A DOmegaUnitary representing the optimal Clifford+T approximation
+///
+/// A `DOmegaUnitary` representing the optimal Clifford+T approximation.
+///
+/// # Algorithm
+///
+/// 1. Sets up the epsilon-region and unit disk based on the phase mode
+/// 2. Transforms these regions to upright form for efficient searching
+/// 3. Searches for a solution by iteratively increasing T-depth
 fn gridsynth(config: &mut GridSynthConfig, phase: PhaseMode) -> DOmegaUnitary {
     let (epsilon_region, unit_disk, transformed) = setup_regions_and_transform(
         config.theta.clone(),
@@ -534,6 +667,25 @@ fn gridsynth(config: &mut GridSynthConfig, phase: PhaseMode) -> DOmegaUnitary {
     search_for_solution(&epsilon_region, &unit_disk, &transformed, config, phase)
 }
 
+/// Main entry point for GridSynth gate synthesis.
+///
+/// # Arguments
+///
+/// * `config` - The GridSynth configuration
+///
+/// # Returns
+///
+/// A `GridSynthResult` containing:
+/// - The synthesized gate sequence as a string
+/// - Whether a global phase factor was applied
+/// - Optional error metric (if `compute_error` is enabled)
+/// - Optional correctness flag (if `compute_error` is enabled)
+///
+/// # Behavior
+///
+/// - If `up_to_phase` is false: Performs exact synthesis only
+/// - If `up_to_phase` is true: Performs both exact and phase-shifted synthesis,
+///   returning the result with lower T-count
 pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
     // let start_total = if config.measure_time {
     //     Some(Instant::now())

@@ -13,6 +13,13 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use crate::math::{ntz, pow_sqrt2};
 use crate::ring::{DRootTwo, ZOmega, ZRootTwo};
 
+/// Represents an element of D[ω], the dyadic cyclotomic integers.
+///
+/// Elements are represented as u/√2^k where u ∈ Z[ω] and k ≥ 0.
+/// This is the main ring used in the GridSynth algorithm for representing
+/// quantum gate matrices with dyadic denominators.
+///
+/// Various computed properties are cached for performance.
 #[derive(Clone)]
 pub struct DOmega {
     pub u: ZOmega,
@@ -26,6 +33,16 @@ pub struct DOmega {
 }
 
 impl DOmega {
+    /// Creates a new element of D[ω].
+    ///
+    /// # Arguments
+    ///
+    /// * `u` - The numerator in Z[ω]
+    /// * `k` - The denominator exponent (denominator is √2^k)
+    ///
+    /// # Returns
+    ///
+    /// An element representing u/√2^k.
     pub fn new(u: ZOmega, k: i64) -> Self {
         Self {
             u,
@@ -38,6 +55,15 @@ impl DOmega {
         }
     }
 
+    /// Creates an element from an integer.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - An integer value
+    ///
+    /// # Returns
+    ///
+    /// An element representing x in D[ω].
     pub fn from_int(x: IBig) -> Self {
         Self::new(ZOmega::from_int(x), 0)
     }
@@ -54,6 +80,17 @@ impl DOmega {
         Self::new(ZOmega::from_zroottwo(&alpha), k)
     }
 
+    /// Creates an element from a vector (x, y) in D[√2]².
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - The first component in D[√2]
+    /// * `y` - The second component in D[√2]
+    /// * `k` - The target denominator exponent
+    ///
+    /// # Returns
+    ///
+    /// An element representing x + y·ω with denominator √2^k.
     pub fn from_droottwo_vector(x: &DRootTwo, y: &DRootTwo, k: i64) -> Self {
         let omega = ZOmega::new(IBig::ZERO, IBig::ONE, IBig::ZERO, IBig::ZERO);
         let term0 = Self::new(ZOmega::from_zroottwo(&x.alpha), x.k);
@@ -65,10 +102,20 @@ impl DOmega {
         self.scale_cache.get_or_init(|| pow_sqrt2(self.k))
     }
 
+    /// Computes the real part as a high-precision floating-point number.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the real part, cached for performance.
     pub fn real(&self) -> &FBig<HalfEven> {
         self.real_cache.get_or_init(|| self.u.real() / self.scale())
     }
 
+    /// Computes the imaginary part as a high-precision floating-point number.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the imaginary part, cached for performance.
     pub fn imag(&self) -> &FBig<HalfEven> {
         self.imag_cache.get_or_init(|| self.u.imag() / self.scale())
     }
@@ -77,12 +124,22 @@ impl DOmega {
         Complex::new(self.real(), self.imag())
     }
 
+    /// Computes the complex conjugate.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the conjugate, cached for performance.
     pub fn conj(&self) -> &Self {
         self.conj_cache
             .get_or_init(|| Box::new(Self::new(self.u.conj().clone(), self.k)))
             .as_ref()
     }
 
+    /// Computes the conjugate with respect to √2.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the √2-conjugate, cached for performance.
     pub fn conj_sq2(&self) -> &Self {
         self.conj_sq2_cache
             .get_or_init(|| {
@@ -95,12 +152,26 @@ impl DOmega {
             .as_ref()
     }
 
+    /// Adjusts the denominator exponent to a new value.
+    ///
+    /// # Arguments
+    ///
+    /// * `new_k` - The new denominator exponent
+    ///
+    /// # Returns
+    ///
+    /// A new element with the same value but adjusted denominator.
     pub fn renew_denomexp(&self, new_k: i64) -> Self {
         let d = new_k - self.k;
         let new_u = self.mul_by_sqrt2_power(d).u;
         Self::new(new_u, new_k)
     }
 
+    /// Reduces the denominator exponent to its minimal value.
+    ///
+    /// # Returns
+    ///
+    /// A new element with the same value but minimal denominator exponent.
     pub fn reduce_denomexp(&self) -> Self {
         let zero = IBig::ZERO;
         let k_a = if self.u.a == zero {
@@ -141,6 +212,15 @@ impl DOmega {
         self.renew_denomexp(new_k.max(0))
     }
 
+    /// Multiplies by 1/√2.
+    ///
+    /// # Returns
+    ///
+    /// A new element representing self/√2.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the coefficients don't allow exact division by √2.
     pub fn mul_by_inv_sqrt2(&self) -> Self {
         let (a, b, c, d) = (
             self.u.a.clone(),
@@ -162,6 +242,19 @@ impl DOmega {
         }
     }
 
+    /// Multiplies by (√2)^d.
+    ///
+    /// # Arguments
+    ///
+    /// * `d` - The power of √2 (can be negative)
+    ///
+    /// # Returns
+    ///
+    /// A new element representing self × (√2)^d.
+    ///
+    /// # Panics
+    ///
+    /// Panics if d is negative and exact division is not possible.
     pub fn mul_by_sqrt2_power(&self, d: i64) -> Self {
         if d < 0 {
             if d == -1 {
@@ -240,6 +333,11 @@ impl DOmega {
         Self::new(self.u.mul_by_omega_power(n), self.k)
     }
 
+    /// Computes the residue (parity bits) of the numerator coefficients.
+    ///
+    /// # Returns
+    ///
+    /// A 4-bit value encoding the parity of each coefficient.
     pub fn residue(&self) -> u8 {
         self.u.residue()
     }
