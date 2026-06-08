@@ -839,7 +839,9 @@ fn diophantine(
     }
 }
 
-type DiophantineCacheType = LazyLock<Mutex<HashMap<(IBig, IBig), Option<DOmega>>>>;
+// Include the denominator exponent in the key: the same alpha with a different
+// k is a different dyadic Diophantine instance and has a differently scaled w.
+type DiophantineCacheType = LazyLock<Mutex<HashMap<(IBig, IBig, i64), Option<DOmega>>>>;
 static DIOPHANTINE_CACHE: DiophantineCacheType = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 pub fn clear_caches() {
@@ -867,13 +869,14 @@ pub(crate) fn diophantine_dyadic(
     xi: DRootTwo,
     diophantine_data: &mut DiophantineData,
 ) -> Option<DOmega> {
-    let cache_key = (xi.alpha.a.clone(), xi.alpha.b.clone());
+    let cache_key = (xi.alpha.a.clone(), xi.alpha.b.clone(), xi.k);
     if let Ok(cache) = DIOPHANTINE_CACHE.try_lock() {
         if let Some(cached_result) = cache.get(&cache_key) {
             return cached_result.clone();
         }
     }
 
+    let xi_target = DOmega::from_droottwo(xi.alpha.clone(), xi.k);
     let k_div_2 = xi.k >> 1;
     let k_mod_2 = xi.k & 1;
 
@@ -895,6 +898,7 @@ pub(crate) fn diophantine_dyadic(
             Some(DOmega::new(t, k_div_2 + k_mod_2))
         }
     };
+    let result = result.filter(|w| (w.conj() * w) == xi_target);
 
     if let Ok(mut cache) = DIOPHANTINE_CACHE.try_lock() {
         cache.insert(cache_key, result.clone());
