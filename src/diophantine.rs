@@ -560,10 +560,12 @@ fn adj_decompose_int(
 
         match adj_decompose_int_prime_power(&p, k, &mut diophantine_data.rng) {
             Ok(None) => {
-                let individual_timeout = std::cmp::min(diophantine_data.factoring_timeout, 20);
-                if let Some(fac) =
-                    find_factor(&p, individual_timeout, 128, &mut diophantine_data.rng)
-                {
+                if let Some(fac) = find_factor(
+                    &p,
+                    diophantine_data.factoring_timeout,
+                    128,
+                    &mut diophantine_data.rng,
+                ) {
                     facs.push((p / fac.clone(), k));
                     facs.push((fac, k));
                     let (_, new_facs) = decompose_relatively_prime(facs);
@@ -756,10 +758,12 @@ pub fn adj_decompose_selfcoprime(
                 if n < IBig::ZERO {
                     n = -n;
                 }
-                let individual_timeout = std::cmp::min(diophantine_data.factoring_timeout, 15); // Max 15ms per factor
-                if let Some(fac_n) =
-                    find_factor(&n, individual_timeout, 128, &mut diophantine_data.rng)
-                {
+                if let Some(fac_n) = find_factor(
+                    &n,
+                    diophantine_data.factoring_timeout,
+                    128,
+                    &mut diophantine_data.rng,
+                ) {
                     //  &mut diophantine_data.rng) {
                     let fac = ZRootTwo::gcd(xi.clone(), ZRootTwo::from_int(fac_n));
                     facs.push((&eta / &fac, k));
@@ -878,23 +882,6 @@ pub(crate) fn diophantine_dyadic(
     } else {
         xi.alpha
     };
-
-    let alpha_bits = std::cmp::max(alpha.a.bit_len(), alpha.b.bit_len());
-    let (optimized_diophantine_timeout, optimized_factoring_timeout) = if alpha_bits > 1000 {
-        (
-            std::cmp::min(diophantine_data.diophantine_timeout, 50),
-            std::cmp::min(diophantine_data.factoring_timeout, 10),
-        )
-    } else {
-        (
-            std::cmp::min(diophantine_data.diophantine_timeout, 15),
-            std::cmp::min(diophantine_data.factoring_timeout, 3),
-        )
-    };
-
-    // Ugh. I don't like mutating this. But I don't see an easy way around it.
-    diophantine_data.diophantine_timeout = optimized_diophantine_timeout;
-    diophantine_data.factoring_timeout = optimized_factoring_timeout;
 
     let start_time = Instant::now();
     let t = diophantine(&alpha, start_time, diophantine_data);

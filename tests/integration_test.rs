@@ -164,3 +164,19 @@ fn test_low_precision_bug() {
     let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, 1234, verbose, false);
     gridsynth_gates(&mut gridsynth_config);
 }
+
+#[test]
+#[serial]
+fn test_timeouts_preserved_after_synthesis() {
+    let mut gridsynth_config =
+        config_from_theta_epsilon(std::f64::consts::PI / 8.0, 1e-10, 1234, false, true);
+    gridsynth_config.diophantine_data.diophantine_timeout = 237;
+    gridsynth_config.diophantine_data.factoring_timeout = 61;
+
+    clear_caches();
+    let result = gridsynth_gates(&mut gridsynth_config);
+
+    assert!(!result.gates.is_empty());
+    assert_eq!(gridsynth_config.diophantine_data.diophantine_timeout, 237);
+    assert_eq!(gridsynth_config.diophantine_data.factoring_timeout, 61);
+}
