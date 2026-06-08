@@ -39,7 +39,7 @@ fn is_small_prime(n: u64) -> bool {
     match n {
         0 | 1 => false,
         2 => true,
-        _ if n % 2 == 0 => false,
+        _ if n.is_multiple_of(2) => false,
         3..=16 => [3, 5, 7, 11, 13].contains(&n),
         _ => {
             let witnesses = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37];
@@ -51,7 +51,7 @@ fn is_small_prime(n: u64) -> bool {
 fn miller_rabin_deterministic(n: u64, witnesses: &[u64]) -> bool {
     let mut d = n - 1;
     let mut r = 0;
-    while d % 2 == 0 {
+    while d.is_multiple_of(2) {
         d /= 2;
         r += 1;
     }
@@ -401,7 +401,7 @@ fn find_factor<R: Rng + ?Sized>(
                 if start.elapsed().as_millis() >= timeout_ms {
                     break;
                 }
-                if n_u64 % i == 0 {
+                if n_u64.is_multiple_of(i) {
                     let result = Some(IBig::from(i));
                     if let Ok(mut cache) = FACTOR_CACHE.try_lock() {
                         cache.insert(n.clone(), result.clone());
