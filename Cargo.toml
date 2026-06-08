@@ -36,7 +36,7 @@ env_logger = "0.11"
 
 [dev-dependencies]
 serial_test = "3"
-ntest = "0.9"
+ntest = "0.8.0"
 
 [profile.release]
 opt-level = 3
