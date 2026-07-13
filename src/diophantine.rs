@@ -839,8 +839,8 @@ fn diophantine(
     }
 }
 
-// Include the denominator exponent in the key: the same alpha with a different
-// k is a different dyadic Diophantine instance and has a differently scaled w.
+// Cache solutions w to the dyadic Diophantine equation w†w = ξ,
+// keyed by ξ's complete representation (xi.alpha.a, xi.alpha.b, xi.k).
 type DiophantineCacheType = LazyLock<Mutex<HashMap<(IBig, IBig, i64), Option<DOmega>>>>;
 static DIOPHANTINE_CACHE: DiophantineCacheType = LazyLock::new(|| Mutex::new(HashMap::new()));
 
