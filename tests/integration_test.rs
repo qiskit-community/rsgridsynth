@@ -167,6 +167,52 @@ fn test_low_precision_bug() {
 
 #[test]
 #[serial]
+fn test_shared_cache_across_denomexp_no_panic() {
+    let epsilon = 1e-3;
+    let verbose = false;
+    let seed = 0u64;
+    let up_to_phase = true;
+    let mut panic_thetas = Vec::new();
+    let mut incorrect_thetas = Vec::new();
+    let mut max_error = 0.0_f64;
+
+    clear_caches();
+    for i in 1..=320 {
+        let theta = i as f64 * 0.01;
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut gridsynth_config =
+                config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase)
+                    .with_compute_error(true);
+            gridsynth_gates(&mut gridsynth_config)
+        }));
+
+        match result {
+            Ok(res) => {
+                if let Some(error) = res.error {
+                    max_error = max_error.max(error);
+                }
+                if !res.is_correct.is_some_and(|v| v) {
+                    incorrect_thetas.push(theta);
+                }
+            }
+            Err(_) => panic_thetas.push(theta),
+        }
+    }
+
+    println!(
+        "shared-cache scan: n=320 epsilon={epsilon} panics={} incorrect={} max_error={max_error:.6e}",
+        panic_thetas.len(),
+        incorrect_thetas.len()
+    );
+    assert!(panic_thetas.is_empty(), "panic_thetas={panic_thetas:?}");
+    assert!(
+        incorrect_thetas.is_empty(),
+        "incorrect_thetas={incorrect_thetas:?}"
+    );
+}
+
+#[test]
+#[serial]
 fn test_timeouts_preserved_after_synthesis() {
     let mut gridsynth_config =
         config_from_theta_epsilon(std::f64::consts::PI / 8.0, 1e-10, 1234, false, true);
