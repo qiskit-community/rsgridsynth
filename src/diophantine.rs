@@ -22,7 +22,20 @@ static PRIMALITY_CACHE: LazyLock<Mutex<HashMap<IBig, bool>>> =
 type SqrtCacheType = LazyLock<Mutex<HashMap<(IBig, IBig), Option<IBig>>>>;
 static SQRT_CACHE: SqrtCacheType = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-// WARN: Distribution of random_ubig is different from the rng.random_range
+/// Generates a random unsigned big integer with a specified number of bits.
+///
+/// # Arguments
+///
+/// * `bits` - The number of bits for the generated number
+/// * `rng` - A random number generator
+///
+/// # Returns
+///
+/// A random `UBig` with the specified bit length, with the most significant bit set to 1.
+///
+/// # Warning
+///
+/// The distribution of this function differs from `rng.random_range`.
 fn random_ubig<R>(bits: usize, rng: &mut R) -> UBig
 where
     R: Rng + ?Sized,
@@ -35,6 +48,20 @@ where
     n
 }
 
+/// Checks if a small 64-bit number is prime using deterministic Miller-Rabin test.
+///
+/// # Arguments
+///
+/// * `n` - The number to test for primality
+///
+/// # Returns
+///
+/// `true` if `n` is prime, `false` otherwise.
+///
+/// # Implementation
+///
+/// Uses a deterministic Miller-Rabin test with a fixed set of witnesses
+/// that guarantees correctness for all 64-bit integers.
 fn is_small_prime(n: u64) -> bool {
     match n {
         0 | 1 => false,
@@ -48,6 +75,16 @@ fn is_small_prime(n: u64) -> bool {
     }
 }
 
+/// Performs a deterministic Miller-Rabin primality test.
+///
+/// # Arguments
+///
+/// * `n` - The number to test for primality
+/// * `witnesses` - Array of witness values for the test
+///
+/// # Returns
+///
+/// `true` if `n` passes all witness tests (likely prime), `false` if composite.
 fn miller_rabin_deterministic(n: u64, witnesses: &[u64]) -> bool {
     let mut d = n - 1;
     let mut r = 0;
@@ -76,6 +113,17 @@ fn miller_rabin_deterministic(n: u64, witnesses: &[u64]) -> bool {
     true
 }
 
+/// Computes modular exponentiation for 64-bit integers: (base^exp) mod modulus.
+///
+/// # Arguments
+///
+/// * `base` - The base value
+/// * `exp` - The exponent
+/// * `modulus` - The modulus
+///
+/// # Returns
+///
+/// The result of (base^exp) mod modulus.
 fn modpow_u64(mut base: u64, mut exp: u64, modulus: u64) -> u64 {
     let mut result = 1;
     base %= modulus;
@@ -89,6 +137,17 @@ fn modpow_u64(mut base: u64, mut exp: u64, modulus: u64) -> u64 {
     result
 }
 
+/// Computes modular exponentiation for arbitrary-precision integers: (base^exp) mod modulus.
+///
+/// # Arguments
+///
+/// * `base` - The base value
+/// * `exp` - The exponent
+/// * `modulus` - The modulus
+///
+/// # Returns
+///
+/// The result of (base^exp) mod modulus using binary exponentiation.
 fn modpow(mut base: IBig, exp: &IBig, modulus: &IBig) -> IBig {
     let mut result = IBig::ONE;
     base %= modulus;
@@ -103,6 +162,26 @@ fn modpow(mut base: IBig, exp: &IBig, modulus: &IBig) -> IBig {
     result
 }
 
+/// Tests whether an arbitrary-precision integer is prime using probabilistic Miller-Rabin.
+///
+/// # Arguments
+///
+/// * `n` - The number to test for primality
+/// * `iterations` - Maximum number of Miller-Rabin iterations (capped at 4 for performance)
+/// * `rng` - Random number generator for selecting test witnesses
+///
+/// # Returns
+///
+/// `true` if `n` is likely prime, `false` if definitely composite.
+///
+/// # Caching
+///
+/// Results are cached in `PRIMALITY_CACHE` for performance. The function is thread-safe.
+///
+/// # Performance
+///
+/// For numbers ≤ 64 bits, uses deterministic testing. For larger numbers,
+/// uses probabilistic Miller-Rabin with reduced iterations for efficiency.
 pub fn is_prime<R: Rng + ?Sized>(mut n: IBig, iterations: usize, rng: &mut R) -> bool {
     if n < IBig::ZERO {
         n = -n;
@@ -174,6 +253,21 @@ pub fn is_prime<R: Rng + ?Sized>(mut n: IBig, iterations: usize, rng: &mut R) ->
     true
 }
 
+/// Finds a square root of -1 modulo a prime p (if it exists).
+///
+/// # Arguments
+///
+/// * `p` - A prime modulus
+/// * `trials` - Maximum number of random trials (capped at 8 for performance)
+/// * `rng` - Random number generator
+///
+/// # Returns
+///
+/// `Some(h)` where h² ≡ -1 (mod p), or `None` if no solution exists or trials exhausted.
+///
+/// # Caching
+///
+/// Results are cached in `SQRT_CACHE` for performance.
 pub fn sqrt_negative_one<R: Rng + ?Sized>(p: &IBig, trials: usize, rng: &mut R) -> Option<IBig> {
     let cache_key = (p.clone(), IBig::NEG_ONE);
     if let Ok(cache) = SQRT_CACHE.lock() {
@@ -209,6 +303,22 @@ pub fn sqrt_negative_one<R: Rng + ?Sized>(p: &IBig, trials: usize, rng: &mut R) 
     None
 }
 
+/// Computes a square root of x modulo prime p using Tonelli-Shanks-like algorithm.
+///
+/// # Arguments
+///
+/// * `x` - The value to find the square root of
+/// * `p` - A prime modulus
+/// * `trials` - Maximum number of random trials (capped at 8 for performance)
+/// * `rng` - Random number generator
+///
+/// # Returns
+///
+/// `Some(r)` where r² ≡ x (mod p), or `None` if x is not a quadratic residue mod p.
+///
+/// # Caching
+///
+/// Results are cached in `SQRT_CACHE` for performance.
 fn root_mod<R: Rng + ?Sized>(x: IBig, p: &IBig, trials: usize, rng: &mut R) -> Option<IBig> {
     let x: IBig = x.rem_euclid(p).into();
 
@@ -264,6 +374,9 @@ fn root_mod<R: Rng + ?Sized>(x: IBig, p: &IBig, trials: usize, rng: &mut R) -> O
     None
 }
 
+/// Represents an element in the field extension F_p² = F_p[x]/(x² - base).
+///
+/// Elements are of the form a + b*√base where a, b ∈ F_p.
 #[derive(Clone)]
 pub struct Fp2 {
     a: IBig,
@@ -273,6 +386,18 @@ pub struct Fp2 {
 }
 
 impl Fp2 {
+    /// Creates a new element in F_p² with specified modulus.
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - The rational part coefficient
+    /// * `b` - The irrational part coefficient (multiplies √base)
+    /// * `base` - The base for the field extension (x² = base)
+    /// * `p` - The prime modulus
+    ///
+    /// # Returns
+    ///
+    /// A new `Fp2` element representing a + b*√base in F_p.
     pub fn new_with_modulus(a: IBig, b: IBig, base: IBig, p: &IBig) -> Self {
         Self {
             a: a.rem_euclid(p).into(),
@@ -282,6 +407,15 @@ impl Fp2 {
         }
     }
 
+    /// Computes self raised to the power of exp using binary exponentiation.
+    ///
+    /// # Arguments
+    ///
+    /// * `exp` - The exponent
+    ///
+    /// # Returns
+    ///
+    /// A new `Fp2` element representing self^exp.
     pub fn pow(&mut self, mut exp: IBig) -> Self {
         let mut result = Fp2::new_with_modulus(IBig::ONE, IBig::ZERO, self.base.clone(), &self.p);
         while exp > IBig::ZERO {
@@ -307,6 +441,22 @@ impl Mul for Fp2 {
     }
 }
 
+/// Decomposes a factorization into relatively prime factors.
+///
+/// # Arguments
+///
+/// * `factors` - A vector of (base, exponent) pairs representing a factorization
+///
+/// # Returns
+///
+/// A tuple `(u, facs)` where:
+/// - `u` is a unit factor
+/// - `facs` is a vector of relatively prime factors with their exponents
+///
+/// # Algorithm
+///
+/// Processes factors to ensure all bases in the result are pairwise coprime,
+/// splitting factors with common divisors as needed.
 fn decompose_relatively_prime(mut factors: Vec<(IBig, i32)>) -> (IBig, Vec<(IBig, i32)>) {
     let mut u = IBig::ONE;
     let mut facs: Vec<(IBig, i32)> = vec![];
@@ -352,6 +502,28 @@ fn decompose_relatively_prime(mut factors: Vec<(IBig, i32)>) -> (IBig, Vec<(IBig
 static FACTOR_CACHE: LazyLock<Mutex<HashMap<IBig, Option<IBig>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// Attempts to find a non-trivial factor of n using trial division and Pollard's rho.
+///
+/// # Arguments
+///
+/// * `n` - The number to factor
+/// * `timeout_ms` - Maximum time in milliseconds to spend factoring
+/// * `_m` - Unused parameter (kept for API compatibility)
+/// * `rng` - Random number generator for probabilistic algorithms
+///
+/// # Returns
+///
+/// `Some(factor)` if a non-trivial factor is found, `None` otherwise.
+///
+/// # Caching
+///
+/// Results are cached in `FACTOR_CACHE` for performance.
+///
+/// # Algorithm
+///
+/// 1. Checks for small prime factors using trial division
+/// 2. For numbers ≤ 32 bits, uses optimized trial division
+/// 3. For larger numbers, uses Pollard's rho algorithm
 fn find_factor<R: Rng + ?Sized>(
     n: &IBig,
     timeout_ms: u128,
@@ -429,6 +601,22 @@ fn find_factor<R: Rng + ?Sized>(
     result
 }
 
+/// Pollard's rho algorithm for integer factorization.
+///
+/// # Arguments
+///
+/// * `n` - The number to factor
+/// * `timeout_ms` - Maximum time in milliseconds to spend
+/// * `rng` - Random number generator for selecting starting values
+///
+/// # Returns
+///
+/// `Some(factor)` if a non-trivial factor is found, `None` otherwise.
+///
+/// # Algorithm
+///
+/// Uses the cycle-finding algorithm with random polynomial functions
+/// to find factors probabilistically.
 fn pollard_rho<R: Rng + ?Sized>(n: &IBig, timeout_ms: u128, rng: &mut R) -> Option<IBig> {
     let start = Instant::now();
     for _ in 0..5 {
@@ -464,6 +652,25 @@ fn pollard_rho<R: Rng + ?Sized>(n: &IBig, timeout_ms: u128, rng: &mut R) -> Opti
     None
 }
 
+/// Decomposes a prime integer into Z[ω] if possible.
+///
+/// # Arguments
+///
+/// * `p` - A prime number
+/// * `rng` - Random number generator
+///
+/// # Returns
+///
+/// - `Ok(Some(t))` if p can be decomposed as t*conj(t) in Z[ω]
+/// - `Ok(None)` if p is inert in Z[ω]
+/// - `Err(msg)` if an error occurs
+///
+/// # Algorithm
+///
+/// Uses different strategies based on p mod 8:
+/// - p ≡ 1 (mod 4): Uses sqrt(-1) mod p
+/// - p ≡ 3 (mod 8): Uses sqrt(-2) mod p
+/// - p ≡ 7 (mod 8): Checks if 2 is a quadratic residue
 fn adj_decompose_int_prime<R>(p: &IBig, rng: &mut R) -> Result<Option<ZOmega>, String>
 where
     R: Rng + ?Sized,
@@ -525,6 +732,23 @@ where
     }
 }
 
+/// Decomposes a prime power p^k into Z[ω] if possible.
+///
+/// # Arguments
+///
+/// * `p` - A prime number
+/// * `k` - The exponent
+/// * `rng` - Random number generator
+///
+/// # Returns
+///
+/// - `Ok(Some(t))` if p^k can be decomposed in Z[ω]
+/// - `Ok(None)` if decomposition is not possible
+/// - `Err(msg)` if an error occurs
+///
+/// # Algorithm
+///
+/// For even k, returns p^(k/2). For odd k, decomposes p and raises to power k.
 fn adj_decompose_int_prime_power<R>(p: &IBig, k: i32, rng: &mut R) -> Result<Option<ZOmega>, String>
 where
     R: Rng + ?Sized,
@@ -540,6 +764,24 @@ where
     }
 }
 
+/// Decomposes an integer into Z[ω] by factoring and decomposing each prime power.
+///
+/// # Arguments
+///
+/// * `n` - The integer to decompose
+/// * `start_time` - Start time for timeout tracking
+/// * `diophantine_data` - Configuration including timeout and RNG
+///
+/// # Returns
+///
+/// - `Ok(Some(t))` if n can be decomposed as t*conj(t) in Z[ω]
+/// - `Ok(None)` if decomposition fails or times out
+/// - `Err(msg)` if an error occurs
+///
+/// # Algorithm
+///
+/// Factors n and attempts to decompose each prime power factor,
+/// respecting timeout constraints.
 fn adj_decompose_int(
     mut n: IBig,
     start_time: Instant,
@@ -585,6 +827,19 @@ fn adj_decompose_int(
     Ok(Some(t))
 }
 
+/// Decomposes a self-associate element of Z[√2] into Z[ω].
+///
+/// # Arguments
+///
+/// * `xi` - A self-associate element (xi = conj(xi))
+/// * `start_time` - Start time for timeout tracking
+/// * `diophantine_data` - Configuration including timeout and RNG
+///
+/// # Returns
+///
+/// - `Ok(Some(t))` if xi can be decomposed in Z[ω]
+/// - `Ok(None)` if decomposition fails or times out
+/// - `Err(msg)` if an error occurs
 fn adj_decompose_selfassociate(
     xi: ZRootTwo,
     start_time: Instant,
@@ -608,6 +863,22 @@ fn adj_decompose_selfassociate(
     }
 }
 
+/// Decomposes a factorization in Z[√2] into relatively prime factors.
+///
+/// # Arguments
+///
+/// * `partial_facs` - A vector of (base, exponent) pairs in Z[√2]
+///
+/// # Returns
+///
+/// A tuple `(u, facs)` where:
+/// - `u` is a unit factor in Z[√2]
+/// - `facs` is a vector of relatively prime factors with their exponents
+///
+/// # Algorithm
+///
+/// Similar to `decompose_relatively_prime` but works in the ring Z[√2],
+/// using similarity and GCD operations specific to that ring.
 pub fn decompose_relatively_zomega_prime(
     partial_facs: Vec<(ZRootTwo, i32)>,
 ) -> (ZRootTwo, Vec<(ZRootTwo, i32)>) {
@@ -652,6 +923,23 @@ pub fn decompose_relatively_zomega_prime(
     (u, facs)
 }
 
+/// Decomposes a prime element of Z[√2] into Z[ω] if possible.
+///
+/// # Arguments
+///
+/// * `eta` - A prime element in Z[√2]
+/// * `rng` - Random number generator
+///
+/// # Returns
+///
+/// - `Ok(Some(t))` if eta can be decomposed in Z[ω]
+/// - `Ok(None)` if eta is inert in Z[ω]
+/// - `Err(msg)` if an error occurs
+///
+/// # Algorithm
+///
+/// Uses the norm of eta and applies similar techniques as `adj_decompose_int_prime`,
+/// but verifies the result divides eta in Z[√2].
 pub fn adj_decompose_zomega_prime<R: Rng + ?Sized>(
     eta: ZRootTwo,
     rng: &mut R,
@@ -724,6 +1012,19 @@ pub fn adj_decompose_zomega_prime<R: Rng + ?Sized>(
     }
 }
 
+/// Decomposes a prime power in Z[√2] into Z[ω] if possible.
+///
+/// # Arguments
+///
+/// * `eta` - A prime element in Z[√2]
+/// * `k` - The exponent
+/// * `rng` - Random number generator
+///
+/// # Returns
+///
+/// - `Ok(Some(t))` if eta^k can be decomposed in Z[ω]
+/// - `Ok(None)` if decomposition is not possible
+/// - `Err(msg)` if an error occurs
 pub fn adj_decompose_zomega_prime_power<R: Rng + ?Sized>(
     eta: ZRootTwo,
     k: i32,
@@ -740,6 +1041,23 @@ pub fn adj_decompose_zomega_prime_power<R: Rng + ?Sized>(
     }
 }
 
+/// Decomposes a self-coprime element of Z[√2] into Z[ω].
+///
+/// # Arguments
+///
+/// * `xi` - A self-coprime element (gcd(xi, conj(xi)) = 1)
+/// * `start_time` - Start time for timeout tracking
+/// * `diophantine_data` - Configuration including timeout and RNG
+///
+/// # Returns
+///
+/// - `Ok(Some(t))` if xi can be decomposed in Z[ω]
+/// - `Ok(None)` if decomposition fails or times out
+/// - `Err(msg)` if an error occurs
+///
+/// # Algorithm
+///
+/// Factors xi in Z[√2] and decomposes each prime power factor.
 pub fn adj_decompose_selfcoprime(
     xi: ZRootTwo,
     start_time: Instant,
@@ -785,6 +1103,23 @@ pub fn adj_decompose_selfcoprime(
     Ok(Some(t))
 }
 
+/// Main decomposition function for elements of Z[√2] into Z[ω].
+///
+/// # Arguments
+///
+/// * `xi` - An element of Z[√2] to decompose
+/// * `start_time` - Start time for timeout tracking
+/// * `diophantine_data` - Configuration including timeout and RNG
+///
+/// # Returns
+///
+/// - `Ok(Some(t))` if xi can be decomposed in Z[ω]
+/// - `Ok(None)` if decomposition fails or times out
+/// - `Err(msg)` if an error occurs
+///
+/// # Algorithm
+///
+/// Splits xi into self-associate and self-coprime parts, then decomposes each separately.
 fn adj_decompose(
     xi: ZRootTwo,
     start_time: Instant,
@@ -809,6 +1144,25 @@ fn adj_decompose(
         Err(e) => Err(e),
     }
 }
+/// Solves the Diophantine equation to find t ∈ Z[ω] such that t*conj(t) = xi.
+///
+/// # Arguments
+///
+/// * `xi` - A positive element of Z[√2]
+/// * `start_time` - Start time for timeout tracking
+/// * `diophantine_data` - Configuration including timeout and RNG
+///
+/// # Returns
+///
+/// - `Ok(Some(t))` where t*conj(t) = xi
+/// - `Ok(None)` if no solution exists or computation times out
+/// - `Err(msg)` if xi is negative or an error occurs
+///
+/// # Algorithm
+///
+/// 1. Decomposes xi using `adj_decompose`
+/// 2. Computes the unit factor u = xi / (t*conj(t))
+/// 3. Takes the square root of u and multiplies by t
 fn diophantine(
     xi: &ZRootTwo,
     start_time: Instant,
@@ -844,6 +1198,15 @@ fn diophantine(
 type DiophantineCacheType = LazyLock<Mutex<HashMap<(IBig, IBig, i64), Option<DOmega>>>>;
 static DIOPHANTINE_CACHE: DiophantineCacheType = LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// Clears all internal caches used by the Diophantine solver.
+///
+/// This includes:
+/// - Primality test cache
+/// - Square root modulo cache
+/// - Factorization cache
+/// - Diophantine solution cache
+///
+/// Useful for freeing memory or ensuring fresh computations in testing.
 pub fn clear_caches() {
     if let Ok(mut cache) = PRIMALITY_CACHE.try_lock() {
         cache.clear();
@@ -865,6 +1228,27 @@ pub fn clear_caches() {
     }
 }
 
+/// Solves the Diophantine equation for dyadic elements (elements with denominator 2^k).
+///
+/// # Arguments
+///
+/// * `xi` - A dyadic element of D[√2] (rationals with denominator 2^k)
+/// * `diophantine_data` - Configuration including timeout and RNG
+///
+/// # Returns
+///
+/// `Some(t)` where t ∈ D[ω] and t*conj(t) = xi, or `None` if no solution found.
+///
+/// # Caching
+///
+/// Results are cached in `DIOPHANTINE_CACHE` for performance.
+///
+/// # Algorithm
+///
+/// 1. Normalizes xi by handling the dyadic denominator
+/// 2. Calls the main `diophantine` solver on the normalized value
+/// 3. Adjusts the result back to dyadic form
+/// 4. Applies timeout optimizations based on input size
 pub(crate) fn diophantine_dyadic(
     xi: DRootTwo,
     diophantine_data: &mut DiophantineData,

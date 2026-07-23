@@ -6,6 +6,10 @@ use dashu_int::{IBig, UBig};
 use rand::{rngs::StdRng, SeedableRng};
 use std::str::FromStr;
 
+/// Configuration data for Diophantine equation solving.
+///
+/// Contains timeout parameters and a random number generator for
+/// probabilistic algorithms used in Diophantine equation solving.
 #[derive(Debug)]
 pub struct DiophantineData {
     pub diophantine_timeout: u128,
@@ -13,6 +17,11 @@ pub struct DiophantineData {
     pub rng: StdRng,
 }
 
+/// Main configuration structure for the GridSynth algorithm.
+///
+/// Contains all parameters needed to run the gridsynth gate synthesis algorithm,
+/// including the target rotation angle, precision requirements, timeout settings,
+/// and various flags controlling the algorithm's behavior.
 #[derive(Debug)]
 pub struct GridSynthConfig {
     pub theta: FBig<HalfEven>,
@@ -25,7 +34,16 @@ pub struct GridSynthConfig {
 }
 
 impl GridSynthConfig {
-    /// Turns on or off checking solutions at the end of the run
+    /// Configures whether to compute and verify the approximation error.
+    ///
+    /// # Arguments
+    ///
+    /// * `compute_error` - If true, computes the error between the synthesized
+    ///   gate sequence and the target unitary after synthesis completes
+    ///
+    /// # Returns
+    ///
+    /// A new `GridSynthConfig` with the `compute_error` flag updated
     pub fn with_compute_error(self, compute_error: bool) -> Self {
         Self {
             compute_error,
@@ -34,7 +52,10 @@ impl GridSynthConfig {
     }
 }
 
-/// The result of running the gridsynth algorithm
+/// The result of running the GridSynth algorithm.
+///
+/// Contains the synthesized gate sequence, global phase information,
+/// and optional error metrics if error computation was enabled.
 pub struct GridSynthResult {
     /// List of gates.
     pub gates: String,
@@ -49,6 +70,23 @@ pub struct GridSynthResult {
     pub is_correct: Option<bool>,
 }
 
+/// Parses a decimal string with optional scientific notation into a rational number.
+///
+/// # Arguments
+///
+/// * `input` - A string representing a decimal number, optionally in scientific notation
+///   (e.g., "3.14", "-2.5e-3", "1.23E+4")
+///
+/// # Returns
+///
+/// An `Option` containing a tuple `(numerator, denominator)` representing the rational
+/// number as `numerator / denominator`. Returns `None` if the input is malformed.
+///
+/// # Examples
+///
+/// - "3.14" → (314, 100)
+/// - "2.5e-3" → (25, 10000)
+/// - "-1.5E2" → (-150, 1)
 pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
     let input = input.trim();
     let (sign, body) = if let Some(s) = input.strip_prefix('-') {
@@ -95,8 +133,31 @@ pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
     Some((numerator, denominator))
 }
 
-/// Creates the default config to easily call the code from other rust packages.
-/// `seed` is used to set single RNG that is used through the call to `gridsynth`.
+/// Creates a default GridSynth configuration from basic parameters.
+///
+/// This is a convenience function for calling GridSynth from other Rust packages
+/// without needing to manually construct all configuration details.
+///
+/// # Arguments
+///
+/// * `theta` - The target rotation angle in radians
+/// * `epsilon` - The desired precision/error tolerance
+/// * `seed` - Random seed for the RNG used throughout the synthesis
+/// * `verbose` - Enable verbose logging output
+/// * `up_to_phase` - If true, synthesize up to a global phase factor
+///
+/// # Returns
+///
+/// A fully configured `GridSynthConfig` with:
+/// - Default timeout values (200ms for Diophantine, 50ms for factoring)
+/// - Automatically calculated precision based on epsilon
+/// - Minimum precision of 16 bits
+/// - Error computation disabled by default
+///
+/// # Precision Handling
+///
+/// The function automatically resets and recalculates the global precision
+/// based on the epsilon value to ensure consistent behavior across multiple calls.
 pub fn config_from_theta_epsilon(
     theta: f64,
     epsilon: f64,

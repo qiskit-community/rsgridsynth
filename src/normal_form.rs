@@ -4,6 +4,9 @@
 use std::fmt::{Debug, Display, Formatter, Result};
 use std::ops::Mul;
 
+/// Represents the axis for Clifford gate decomposition.
+///
+/// Used to classify Clifford gates into cosets based on their action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Axis {
     I = 0,
@@ -11,6 +14,10 @@ pub enum Axis {
     SH = 2,
 }
 
+/// Represents a syllable in the normal form decomposition.
+///
+/// Syllables are the basic building blocks for representing T-gates
+/// and their conjugates by Clifford gates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Syllable {
     I = 0,
@@ -19,6 +26,13 @@ pub enum Syllable {
     SHT = 3,
 }
 
+/// Represents a Clifford gate in a compact form.
+///
+/// A Clifford gate is represented as E^a X^b S^c ω^d where:
+/// - E is a specific Clifford generator
+/// - X is the Pauli-X gate
+/// - S is the phase gate
+/// - ω is the 8th root of unity (exp(iπ/4))
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Clifford {
     a: u8,
@@ -28,6 +42,18 @@ pub struct Clifford {
 }
 
 impl Clifford {
+    /// Creates a new Clifford gate with the given exponents.
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - Exponent for E (reduced mod 3)
+    /// * `b` - Exponent for X (reduced mod 2)
+    /// * `c` - Exponent for S (reduced mod 4)
+    /// * `d` - Exponent for ω (reduced mod 8)
+    ///
+    /// # Returns
+    ///
+    /// A normalized Clifford gate.
     pub fn new(mut a: i32, mut b: i32, mut c: i32, mut d: i32) -> Self {
         a = a.rem_euclid(3);
         b &= 1;
@@ -41,11 +67,22 @@ impl Clifford {
         }
     }
 
+    /// Computes the inverse of this Clifford gate.
+    ///
+    /// # Returns
+    ///
+    /// The inverse Clifford gate such that self * self.inv() = I.
     pub fn inv(&self) -> Self {
         let (a, b, c, d) = CINV_TABLE[((self.a << 3) | (self.b << 2) | self.c) as usize];
         Clifford::new(a as i32, b as i32, c as i32, d as i32 - self.d as i32)
     }
 
+    /// Decomposes the Clifford into an axis and a coset representative.
+    ///
+    /// # Returns
+    ///
+    /// A tuple `(axis, clifford)` where the axis indicates the coset
+    /// and clifford is the representative within that coset.
     pub fn decompose_coset(&self) -> (Axis, Self) {
         match self.a {
             0 => (Axis::I, *self),
@@ -55,6 +92,12 @@ impl Clifford {
         }
     }
 
+    /// Decomposes the Clifford for T-gate conjugation.
+    ///
+    /// # Returns
+    ///
+    /// A tuple `(axis, clifford)` used in the normal form algorithm
+    /// to handle T-gate conjugation efficiently.
     pub fn decompose_tconj(&self) -> (Axis, Self) {
         let (axis, c, d) = TCONJ_TABLE[((self.a << 1) | self.b) as usize];
         (
@@ -68,6 +111,17 @@ impl Clifford {
         )
     }
 
+    /// Converts the Clifford gate to a gate sequence string.
+    ///
+    /// # Returns
+    ///
+    /// A string representation using gates H, X, S, W, or "I" for identity.
+    /// Converts the normal form back to a gate sequence string.
+    ///
+    /// # Returns
+    ///
+    /// A string representation of the circuit using syllables and Clifford gates,
+    /// or "I" for the identity.
     pub fn to_gates(&self) -> String {
         let (axis, c) = self.decompose_coset();
         let mut gates = match axis {
@@ -115,6 +169,12 @@ impl Mul for Clifford {
     }
 }
 
+/// Represents a quantum circuit in normal form.
+///
+/// The normal form is a canonical representation of Clifford+T circuits
+/// that facilitates optimization and analysis. It consists of a sequence
+/// of syllables (T-gates and their Clifford conjugates) followed by a
+/// final Clifford gate.
 #[derive(Clone)]
 pub struct NormalForm {
     syllables: Vec<Syllable>,
@@ -122,6 +182,11 @@ pub struct NormalForm {
 }
 
 impl NormalForm {
+    /// Creates a new empty normal form (identity circuit).
+    ///
+    /// # Returns
+    ///
+    /// A `NormalForm` representing the identity operation.
     pub fn new() -> Self {
         Self {
             syllables: vec![],
@@ -129,6 +194,15 @@ impl NormalForm {
         }
     }
 
+    /// Appends a gate to the normal form, maintaining the canonical structure.
+    ///
+    /// # Arguments
+    ///
+    /// * `g` - The gate to append ("H", "S", "X", "W", or "T")
+    ///
+    /// # Panics
+    ///
+    /// Panics if an unsupported gate is provided.
     fn append_gate(&mut self, g: &str) {
         match g {
             "H" => self.c = self.c * CLIFFORD_H,
@@ -176,6 +250,15 @@ impl NormalForm {
         }
     }
 
+    /// Constructs a normal form from a gate sequence string.
+    ///
+    /// # Arguments
+    ///
+    /// * `gates` - A string of gate characters (H, S, X, W, T)
+    ///
+    /// # Returns
+    ///
+    /// A `NormalForm` representing the circuit in canonical form.
     pub fn from_gates(gates: &str) -> Self {
         let mut nf = Self::new();
         for ch in gates.chars() {

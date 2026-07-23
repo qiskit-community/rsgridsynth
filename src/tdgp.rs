@@ -13,19 +13,68 @@ use crate::odgp::{
 use crate::region::{Ellipse, Interval, Rectangle};
 use crate::ring::{DOmega, DRootTwo};
 
-/// See Remark 5.4, page 5, Ross and Selinger arXiv:1403.2975v3
+/// Trait for regions in the complex plane used in the TDGP (T-Depth Grid Problem).
+///
+/// Represents a region A in the complex plane with methods to check containment
+/// and compute intersections with lines. See Remark 5.4, page 5, Ross and Selinger arXiv:1403.2975v3.
 pub trait Region {
-    /// An ellipse bounding the region A
+    /// Returns an ellipse that bounds the region.
+    ///
+    /// # Returns
+    ///
+    /// An `Ellipse` that contains the entire region A.
     fn ellipse(&self) -> Ellipse;
 
-    /// Returns `true` if `u` is inside the region A
+    /// Checks if a point is inside the region.
+    ///
+    /// # Arguments
+    ///
+    /// * `u` - A point in D[ω] to test
+    ///
+    /// # Returns
+    ///
+    /// `true` if u is inside the region A, `false` otherwise.
     fn inside(&self, u: &DOmega) -> bool;
 
-    /// Intersection of the line with the region A
-    /// Given L(t) = u + tv, return endpoints of the interval {t | L(t) ∈ A}
+    /// Computes the intersection of a line with the region.
+    ///
+    /// # Arguments
+    ///
+    /// * `u` - The starting point of the line
+    /// * `v` - The direction vector of the line
+    ///
+    /// # Returns
+    ///
+    /// `Some((t0, t1))` where the line L(t) = u + tv intersects the region
+    /// for t ∈ [t0, t1], or `None` if there is no intersection.
     fn intersect(&self, u: &DOmega, v: &DOmega) -> Option<(FBig<HalfEven>, FBig<HalfEven>)>;
 }
 
+/// Solves the T-Depth Grid Problem (TDGP).
+///
+/// # Arguments
+///
+/// * `set_a` - The first constraint region
+/// * `set_b` - The second constraint region
+/// * `set_op_g` - A grid operator transformation
+/// * `bbox_a` - Bounding box for region A
+/// * `bbox_b` - Bounding box for region B
+/// * `k` - The T-depth parameter
+/// * `_verbose` - Verbose output flag (currently unused)
+///
+/// # Returns
+///
+/// An iterator over solutions z ∈ D[ω] such that:
+/// - z ∈ set_a
+/// - conj(z) ∈ set_b
+/// - z has the appropriate dyadic denominator for depth k
+///
+/// Returns `None` if no solutions exist.
+///
+/// # Algorithm
+///
+/// Uses the ODGP solver to find candidate solutions, then filters them
+/// based on the region constraints.
 pub fn solve_tdgp<'a>(
     set_a: &'a impl Region,
     set_b: &'a impl Region,
@@ -65,6 +114,22 @@ pub fn solve_tdgp<'a>(
     Some(solutions)
 }
 
+/// Internal helper function for TDGP solving.
+///
+/// # Arguments
+///
+/// * `beta` - A dyadic element in D[√2]
+/// * `set_a` - The first constraint region
+/// * `set_b` - The second constraint region
+/// * `op_g` - A grid operator transformation
+/// * `alpha0` - Initial alpha value
+/// * `v_conj_sq2` - Conjugated direction vector
+/// * `k` - The T-depth parameter
+///
+/// # Returns
+///
+/// An iterator over candidate solutions, or `None` if the line doesn't
+/// intersect both regions.
 fn newproc<'a>(
     beta: DRootTwo,
     set_a: &'a impl Region,
@@ -102,6 +167,16 @@ fn newproc<'a>(
     Some(sol_xx)
 }
 
+/// Computes a small epsilon value for interval fattening.
+///
+/// # Arguments
+///
+/// * `k` - The T-depth parameter
+/// * `int_y` - An interval in the y-direction
+///
+/// # Returns
+///
+/// A small positive value used to slightly expand intervals for numerical stability.
 fn get_dt_x(k: i64, int_y: &Interval) -> FBig<HalfEven> {
     let ten = ib_to_bf_prec(IBig::from(10));
     let shift_k = IBig::from(1) << (k as usize);
