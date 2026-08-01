@@ -11,6 +11,23 @@ use dashu_float::FBig;
 use dashu_int::IBig;
 use std::iter;
 
+/// Solves the Orthogonal Diophantine Grid Problem (ODGP).
+///
+/// # Arguments
+///
+/// * `i` - An interval constraint for the real part
+/// * `j` - An interval constraint for the conjugate part
+///
+/// # Returns
+///
+/// An iterator over all solutions β ∈ Z[√2] such that:
+/// - β.to_real() ∈ i
+/// - β.conj_sq2().to_real() ∈ j
+///
+/// # Algorithm
+///
+/// Translates the problem to have intervals near the origin, solves the
+/// translated problem, then translates solutions back.
 pub fn solve_odgp(i: Interval, j: Interval) -> impl Iterator<Item = ZRootTwo> {
     // Can't return two different iterator types. So we can't do this check.
     // I checked with dbg! to confirm that omitting this check is ok:
@@ -39,6 +56,17 @@ pub fn solve_odgp(i: Interval, j: Interval) -> impl Iterator<Item = ZRootTwo> {
         })
 }
 
+/// Internal implementation of ODGP solver with scaling optimization.
+///
+/// # Arguments
+///
+/// * `i` - An interval constraint for the real part
+/// * `j` - An interval constraint for the conjugate part
+///
+/// # Returns
+///
+/// A boxed iterator over solutions, using scaling by powers of λ = 1 + √2
+/// for efficiency when intervals are large.
 fn solve_odgp_internal(i: Interval, j: Interval) -> Box<dyn Iterator<Item = ZRootTwo>> {
     let bfzero = ib_to_bf_prec(IBig::ZERO);
     if i.width() < bfzero || j.width() < bfzero {
@@ -109,6 +137,22 @@ fn solve_odgp_internal(i: Interval, j: Interval) -> Box<dyn Iterator<Item = ZRoo
     Box::new(sol_iter)
 }
 
+/// Solves ODGP with a parity constraint.
+///
+/// # Arguments
+///
+/// * `i` - An interval constraint for the real part
+/// * `j` - An interval constraint for the conjugate part
+/// * `beta` - A dyadic element whose parity constrains the solutions
+///
+/// # Returns
+///
+/// An iterator over solutions α ∈ Z[√2] that satisfy the interval constraints
+/// and have the same parity as β.
+///
+/// # Algorithm
+///
+/// Transforms the problem by scaling and shifting based on the parity of β.
 pub fn solve_odgp_with_parity(
     i: Interval,
     j: Interval,
@@ -125,10 +169,39 @@ pub fn solve_odgp_with_parity(
         .map(move |alpha| (alpha * ZRootTwo::new(IBig::ZERO, IBig::ONE)) + &p)
 }
 
+/// Finds the first solution to the scaled ODGP.
+///
+/// # Arguments
+///
+/// * `i` - An interval constraint for the real part
+/// * `j` - An interval constraint for the conjugate part
+/// * `k` - The scaling exponent (solutions have denominator 2^k)
+///
+/// # Returns
+///
+/// The first solution if one exists, `None` otherwise.
 pub fn first_solve_scaled_odgp(i: &Interval, j: &Interval, k: i64) -> Option<DRootTwo> {
     solve_scaled_odgp(i, j, k).next()
 }
 
+/// Solves the scaled ODGP where solutions are in D[√2] with denominator 2^k.
+///
+/// # Arguments
+///
+/// * `i` - An interval constraint for the real part
+/// * `j` - An interval constraint for the conjugate part
+/// * `k` - The scaling exponent (solutions have denominator 2^k)
+///
+/// # Returns
+///
+/// An iterator over solutions α ∈ D[√2] with denominator 2^k such that:
+/// - α.to_real() ∈ i
+/// - α.conj_sq2().to_real() ∈ j
+///
+/// # Algorithm
+///
+/// Scales the intervals by (√2)^k and solves the integer ODGP, then
+/// converts solutions to dyadic form.
 pub fn solve_scaled_odgp(i: &Interval, j: &Interval, k: i64) -> impl Iterator<Item = DRootTwo> {
     let scale = pow_sqrt2(k);
     let neg_scale = -scale.clone();
@@ -140,6 +213,23 @@ pub fn solve_scaled_odgp(i: &Interval, j: &Interval, k: i64) -> impl Iterator<It
     solve_odgp(i.scale(&scale), scaled_j).map(move |alpha| DRootTwo::new(alpha, k))
 }
 
+/// Solves the scaled ODGP with parity constraint for k ≠ 0.
+///
+/// # Arguments
+///
+/// * `i` - An interval constraint for the real part
+/// * `j` - An interval constraint for the conjugate part
+/// * `k` - The scaling exponent (must be non-zero)
+/// * `beta` - A dyadic element whose parity constrains the solutions
+///
+/// # Returns
+///
+/// An iterator over solutions α ∈ D[√2] with denominator 2^k that satisfy
+/// the interval constraints and have the same parity as β.
+///
+/// # Note
+///
+/// This function is optimized for k ≠ 0. For k = 0, use `solve_odgp_with_parity`.
 pub fn solve_scaled_odgp_with_parity_k_ne_0(
     i: Interval,
     j: Interval,

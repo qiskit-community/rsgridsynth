@@ -12,6 +12,11 @@ use crate::ring::DOmega;
 use std::cmp::Ordering;
 use std::ops::{Add, Mul, Neg, Sub};
 
+/// Represents an element of D[√2], the dyadic extension of Z[√2].
+///
+/// Elements are represented as α/√2^k where α ∈ Z[√2] and k ≥ 0.
+/// This ring is used in the GridSynth algorithm for representing
+/// intermediate values with dyadic denominators.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DRootTwo {
     pub(crate) alpha: ZRootTwo,
@@ -43,10 +48,29 @@ pub const DELTA_SQUARED: DRootTwo = DRootTwo {
 // };
 
 impl DRootTwo {
+    /// Creates a new element of D[√2].
+    ///
+    /// # Arguments
+    ///
+    /// * `alpha` - The numerator in Z[√2]
+    /// * `k` - The denominator exponent (denominator is √2^k)
+    ///
+    /// # Returns
+    ///
+    /// An element representing α/√2^k.
     pub fn new(alpha: ZRootTwo, k: i64) -> Self {
         Self { alpha, k }
     }
 
+    /// Creates an element from an integer.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - An integer value
+    ///
+    /// # Returns
+    ///
+    /// An element representing x in D[√2].
     pub fn from_int(x: IBig) -> Self {
         Self::new(ZRootTwo::from_int(x), 0)
     }
@@ -55,10 +79,24 @@ impl DRootTwo {
         Self::new(x, 0)
     }
 
+    /// Converts an element from D[ω] to D[√2] if possible.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - An element of D[ω]
+    ///
+    /// # Returns
+    ///
+    /// The corresponding element in D[√2].
     pub fn from_domega(x: DOmega) -> Self {
         Self::new(ZRootTwo::from_zomega(x.u), x.k)
     }
 
+    /// Returns the parity of the numerator's rational part.
+    ///
+    /// # Returns
+    ///
+    /// 0 if even, 1 if odd.
     pub fn parity(&self) -> IBig {
         self.alpha.parity()
     }
@@ -72,10 +110,20 @@ impl DRootTwo {
         IBig::ONE << k
     }
 
+    /// Converts to a high-precision floating-point number.
+    ///
+    /// # Returns
+    ///
+    /// The real value α/√2^k as a floating-point number.
     pub fn to_real(&self) -> FBig<HalfEven> {
         self.alpha.to_real() / self.scale()
     }
 
+    /// Computes the conjugate with respect to √2.
+    ///
+    /// # Returns
+    ///
+    /// The √2-conjugate, with sign adjustment for odd k.
     pub fn conj_sq2(&self) -> Self {
         if self.k & 1 == 1 {
             Self::new(-self.alpha.conj_sq2(), self.k)
@@ -84,12 +132,26 @@ impl DRootTwo {
         }
     }
 
+    /// Adjusts the denominator exponent to a new value.
+    ///
+    /// # Arguments
+    ///
+    /// * `new_k` - The new denominator exponent
+    ///
+    /// # Returns
+    ///
+    /// A new element with the same value but adjusted denominator.
     pub fn renew_denomexp(&self, new_k: i64) -> Self {
         let d = new_k - self.k;
         let new_alpha = self.mul_by_sqrt2_power(d).alpha;
         Self::new(new_alpha, new_k)
     }
 
+    /// Reduces the denominator exponent to its minimal value.
+    ///
+    /// # Returns
+    ///
+    /// A new element with the same value but minimal denominator exponent.
     pub fn reduce_denomexp(&self) -> Self {
         let k_a = if self.alpha.a == IBig::ZERO {
             self.k
@@ -118,6 +180,19 @@ impl DRootTwo {
         }
     }
 
+    /// Multiplies by (√2)^d.
+    ///
+    /// # Arguments
+    ///
+    /// * `d` - The power of √2 (can be negative)
+    ///
+    /// # Returns
+    ///
+    /// A new element representing self × (√2)^d.
+    ///
+    /// # Panics
+    ///
+    /// Panics if d is negative and exact division is not possible.
     pub fn mul_by_sqrt2_power(&self, d: i64) -> Self {
         if d < 0 {
             if d == -1 {
@@ -159,6 +234,19 @@ impl DRootTwo {
         }
     }
 
+    /// Multiplies by (√2)^k by adjusting the denominator exponent.
+    ///
+    /// # Arguments
+    ///
+    /// * `k` - The power of √2 (must be ≤ self.k)
+    ///
+    /// # Returns
+    ///
+    /// A new element with adjusted denominator.
+    ///
+    /// # Panics
+    ///
+    /// Panics if k > self.k.
     pub fn mul_by_sqrt2_power_renewing_denomexp(&self, k: i64) -> Self {
         if k > self.k {
             panic!("ValueError")
@@ -166,6 +254,19 @@ impl DRootTwo {
         Self::new(self.alpha.clone(), self.k - k)
     }
 
+    /// Creates an element representing 1/√2^k.
+    ///
+    /// # Arguments
+    ///
+    /// * `k` - The power (must be non-negative)
+    ///
+    /// # Returns
+    ///
+    /// An element representing 1/√2^k.
+    ///
+    /// # Panics
+    ///
+    /// Panics if k is negative.
     pub fn power_of_inv_sqrt2(k: i64) -> Self {
         if k < 0 {
             panic!("ValueError")

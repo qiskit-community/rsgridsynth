@@ -12,6 +12,10 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 use crate::common::{fb_with_prec, get_prec_bits};
 use std::fmt::{Debug, Display, Formatter};
 
+/// Represents a closed interval [l, r] on the real line.
+///
+/// Used to constrain values in the GridSynth algorithm, particularly
+/// in the ODGP (Orthogonal Diophantine Grid Problem) solver.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Interval {
     pub l: FBig<HalfEven>,
@@ -19,14 +23,34 @@ pub struct Interval {
 }
 
 impl Interval {
+    /// Creates a new interval [l, r].
+    ///
+    /// # Arguments
+    ///
+    /// * `l` - The left endpoint
+    /// * `r` - The right endpoint
     pub fn new(l: FBig<HalfEven>, r: FBig<HalfEven>) -> Self {
         Self { l, r }
     }
 
+    /// Computes the width of the interval.
+    ///
+    /// # Returns
+    ///
+    /// The difference r - l.
     pub fn width(&self) -> FBig<HalfEven> {
         &self.r - &self.l
     }
 
+    /// Expands the interval by epsilon on both sides.
+    ///
+    /// # Arguments
+    ///
+    /// * `eps` - The amount to expand by
+    ///
+    /// # Returns
+    ///
+    /// A new interval [l - eps, r + eps].
     pub fn fatten(&self, eps: &FBig<HalfEven>) -> Self {
         Self {
             l: &self.l - eps,
@@ -34,10 +58,29 @@ impl Interval {
         }
     }
 
+    /// Checks if a value is within the interval.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - The value to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if l ≤ x ≤ r, `false` otherwise.
     pub fn within(&self, x: &FBig<HalfEven>) -> bool {
         (self.l <= *x) && (*x <= self.r)
     }
 
+    /// Scales the interval by a factor.
+    ///
+    /// # Arguments
+    ///
+    /// * `factor` - The scaling factor
+    ///
+    /// # Returns
+    ///
+    /// A new interval [l*factor, r*factor] if factor ≥ 0,
+    /// or [r*factor, l*factor] if factor < 0.
     pub fn scale(&self, factor: &FBig<HalfEven>) -> Self {
         let zero = ib_to_bf_prec(IBig::ZERO);
         if *factor >= zero {
@@ -53,6 +96,15 @@ impl Interval {
         }
     }
 
+    /// Subtracts a value from the interval.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - The value to subtract
+    ///
+    /// # Returns
+    ///
+    /// A new interval [l - x, r - x].
     pub fn sub_ref(&self, x: &FBig<HalfEven>) -> Self {
         Interval {
             l: &self.l - x,
@@ -247,6 +299,9 @@ impl Div<FBig<HalfEven>> for Interval {
     }
 }
 
+/// Represents a rectangle in the 2D plane as a product of two intervals.
+///
+/// Used to represent bounding boxes and constraint regions in the GridSynth algorithm.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rectangle {
     pub x: Interval,
@@ -254,6 +309,14 @@ pub struct Rectangle {
 }
 
 impl Rectangle {
+    /// Creates a new rectangle from interval endpoints.
+    ///
+    /// # Arguments
+    ///
+    /// * `x_l` - Left x-coordinate
+    /// * `x_r` - Right x-coordinate
+    /// * `y_l` - Bottom y-coordinate
+    /// * `y_r` - Top y-coordinate
     pub fn new(
         x_l: FBig<HalfEven>,
         x_r: FBig<HalfEven>,
@@ -266,6 +329,16 @@ impl Rectangle {
         }
     }
 
+    /// Computes the area of the rectangle.
+    ///
+    /// # Returns
+    ///
+    /// The product of the widths of the x and y intervals.
+    /// Computes the area of the ellipse.
+    ///
+    /// # Returns
+    ///
+    /// π / √(det(d)).
     pub fn area(&self) -> FBig<HalfEven> {
         self.x.width() * self.y.width()
     }
@@ -309,6 +382,10 @@ impl Mul<Rectangle> for FBig<HalfEven> {
     }
 }
 
+/// Represents an ellipse in the 2D plane.
+///
+/// An ellipse is defined by a positive definite matrix d and a center point p.
+/// Points (x, y) are inside the ellipse if (v - p)ᵀ d (v - p) ≤ 1.
 #[derive(Debug, Clone)]
 pub struct Ellipse {
     pub d: Matrix2<FBig<HalfEven>>,
@@ -316,10 +393,22 @@ pub struct Ellipse {
 }
 
 impl Ellipse {
+    /// Creates a new ellipse from a matrix and center point.
+    ///
+    /// # Arguments
+    ///
+    /// * `d` - The positive definite matrix defining the ellipse shape
+    /// * `p` - The center point of the ellipse
     pub fn new(d: Matrix2<FBig<HalfEven>>, p: Vector2<FBig<HalfEven>>) -> Self {
         Self { d, p }
     }
 
+    /// Creates a new ellipse from individual matrix and point components.
+    ///
+    /// # Arguments
+    ///
+    /// * `d00`, `d01`, `d10`, `d11` - Matrix elements
+    /// * `px`, `py` - Center point coordinates
     pub fn from(
         d00: FBig<HalfEven>,
         d01: FBig<HalfEven>,
@@ -354,13 +443,32 @@ impl Ellipse {
         &self.d[(1, 1)]
     }
 
+    /// Computes the skew of the ellipse.
+    ///
+    /// # Returns
+    ///
+    /// The square of the off-diagonal element b².
     pub fn skew(&self) -> FBig<HalfEven> {
         self.b().powi(IBig::from(2))
     }
 
+    /// Computes the bias (aspect ratio) of the ellipse.
+    ///
+    /// # Returns
+    ///
+    /// The ratio d/a of the diagonal elements.
     pub fn bias(&self) -> FBig<HalfEven> {
         self.d() / self.a()
     }
+    /// Checks if a point is inside the ellipse.
+    ///
+    /// # Arguments
+    ///
+    /// * `v` - The point to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if (v - p)ᵀ d (v - p) ≤ 1, `false` otherwise.
     pub fn inside(&self, v: &Vector2<FBig<HalfEven>>) -> bool {
         let x = &v[0] - &self.p[0];
         let y = &v[1] - &self.p[1];
@@ -382,6 +490,11 @@ impl Ellipse {
         value <= fb_with_prec(FBig::<HalfEven>::from(1))
     }
 
+    /// Computes the axis-aligned bounding box of the ellipse.
+    ///
+    /// # Returns
+    ///
+    /// A `Rectangle` that tightly bounds the ellipse.
     pub fn bbox(&self) -> Rectangle {
         let ctx: Context<mode::HalfEven> = Context::<mode::HalfEven>::new(get_prec_bits());
         let sqrt_det = self.sqrt_det();
@@ -397,6 +510,11 @@ impl Ellipse {
         }
     }
 
+    /// Computes the square root of the determinant of the matrix d.
+    ///
+    /// # Returns
+    ///
+    /// √(det(d)) = √(ad - b²).
     pub fn sqrt_det(&self) -> FBig<HalfEven> {
         let ctx: Context<mode::HalfEven> = Context::<mode::HalfEven>::new(get_prec_bits());
         let det = self.d() * self.a() - self.b().powi(IBig::from(2));
@@ -407,6 +525,11 @@ impl Ellipse {
         (*PI).clone() / self.sqrt_det()
     }
 
+    /// Normalizes the ellipse to have unit area.
+    ///
+    /// # Returns
+    ///
+    /// A new ellipse with the same shape but scaled to have area π.
     pub fn normalize(&self) -> Self {
         let ctx: Context<mode::HalfEven> = Context::<mode::HalfEven>::new(get_prec_bits());
         let factor = self.sqrt_det();

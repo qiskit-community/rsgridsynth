@@ -14,6 +14,22 @@ use crate::tdgp::Region;
 use dashu_int::IBig;
 use num_traits::Pow;
 
+/// Applies a reduction step by transforming the ellipse pair with a new grid operator.
+///
+/// # Arguments
+///
+/// * `ellipse_pair` - The current ellipse pair
+/// * `op_g_l` - The left grid operator (unchanged)
+/// * `op_g_r` - The right grid operator
+/// * `new_op_g` - The new grid operator to apply
+///
+/// # Returns
+///
+/// A tuple `(transformed_pair, left_op, right_op, done)` where:
+/// - `transformed_pair` is the ellipse pair after transformation
+/// - `left_op` is the unchanged left operator
+/// - `right_op` is the updated right operator
+/// - `done` is always false (more steps needed)
 fn reduction(
     ellipse_pair: EllipsePair,
     op_g_l: &GridOp,
@@ -28,6 +44,16 @@ fn reduction(
     )
 }
 
+/// Shifts an ellipse pair by scaling with powers of λ = 1 + √2.
+///
+/// # Arguments
+///
+/// * `ep` - The ellipse pair to shift
+/// * `n` - The power of λ to use for scaling
+///
+/// # Returns
+///
+/// The shifted ellipse pair with modified matrix elements.
 fn shift_ellipse_pair(mut ep: EllipsePair, n: i32) -> EllipsePair {
     let lambda_n = LAMBDA.pow(&IBig::from(n));
     let lambda_inv_n = LAMBDA.pow(&IBig::from(-n));
@@ -45,6 +71,28 @@ fn shift_ellipse_pair(mut ep: EllipsePair, n: i32) -> EllipsePair {
     ep
 }
 
+/// Performs one step of the upright transformation algorithm.
+///
+/// # Arguments
+///
+/// * `ellipse_pair` - The current ellipse pair
+/// * `op_g_l` - The left grid operator
+/// * `op_g_r` - The right grid operator
+/// * `verbose` - Enable verbose logging
+///
+/// # Returns
+///
+/// A tuple `(new_pair, new_left, new_right, done)` where:
+/// - `new_pair` is the transformed ellipse pair
+/// - `new_left` is the updated left operator
+/// - `new_right` is the updated right operator
+/// - `done` is true if the transformation is complete
+///
+/// # Algorithm
+///
+/// Applies various grid operators (Z, X, S, R, K, A, B, sigma) based on
+/// the properties of the ellipse pair (bias, skew) to progressively
+/// transform it to upright form.
 pub fn step_lemma(
     mut ellipse_pair: EllipsePair,
     op_g_l: &GridOp,
@@ -192,6 +240,23 @@ pub fn step_lemma(
     }
 }
 
+/// Transforms a pair of ellipses to upright form.
+///
+/// # Arguments
+///
+/// * `a` - The first ellipse
+/// * `b` - The second ellipse
+/// * `verbose` - Enable verbose logging
+///
+/// # Returns
+///
+/// A `GridOp` that transforms the ellipse pair to upright form.
+///
+/// # Algorithm
+///
+/// Iteratively applies `step_lemma` until the ellipse pair is in upright form
+/// (low skew and appropriate bias). The result is the composition of all
+/// applied grid operators.
 fn to_upright_ellipse_pair(a: &Ellipse, b: &Ellipse, verbose: bool) -> GridOp {
     if verbose {
         debug!(
@@ -219,6 +284,27 @@ fn to_upright_ellipse_pair(a: &Ellipse, b: &Ellipse, verbose: bool) -> GridOp {
     op_g_l * op_g_r
 }
 
+/// Transforms a pair of regions to upright form and computes bounding boxes.
+///
+/// # Arguments
+///
+/// * `set_a` - The first region
+/// * `set_b` - The second region
+/// * `verbose` - Enable verbose logging
+///
+/// # Returns
+///
+/// A tuple `(op_g, ellipse_a, ellipse_b, bbox_a, bbox_b)` where:
+/// - `op_g` is the grid operator that transforms the regions to upright form
+/// - `ellipse_a` is the transformed first ellipse
+/// - `ellipse_b` is the transformed second ellipse
+/// - `bbox_a` is the bounding box of the first ellipse
+/// - `bbox_b` is the bounding box of the second ellipse
+///
+/// # Purpose
+///
+/// This is the main entry point for the upright transformation algorithm,
+/// used in GridSynth to prepare regions for efficient TDGP solving.
 pub fn to_upright_set_pair(
     set_a: &(impl Region + Debug),
     set_b: &(impl Region + Debug),

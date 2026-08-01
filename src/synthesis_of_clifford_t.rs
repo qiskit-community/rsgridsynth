@@ -10,6 +10,22 @@ use crate::unitary::DOmegaUnitary;
 const BIT_SHIFT: [i32; 16] = [0, 0, 1, 0, 2, 0, 1, 3, 3, 3, 0, 2, 2, 1, 0, 0];
 const BIT_COUNT: [i32; 16] = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
 
+/// Reduces the denominator exponent of a unitary by one level.
+///
+/// # Arguments
+///
+/// * `unitary` - A `DOmegaUnitary` to reduce
+///
+/// # Returns
+///
+/// A tuple `(gates, reduced_unitary)` where:
+/// - `gates` is a string of gates (H, TH, SH, or TSH) to apply
+/// - `reduced_unitary` is the unitary with denominator exponent reduced by 1
+///
+/// # Algorithm
+///
+/// Uses residue analysis to determine the appropriate Clifford gate
+/// to apply before reducing the denominator exponent.
 fn reduce_denomexp(mut unitary: DOmegaUnitary) -> (String, DOmegaUnitary) {
     let t_power_and_h = ["H", "TH", "SH", "TSH"];
     let residue_z = unitary.z.residue();
@@ -45,6 +61,26 @@ fn reduce_denomexp(mut unitary: DOmegaUnitary) -> (String, DOmegaUnitary) {
     }
 }
 
+/// Decomposes a DOmega unitary into a Clifford+T gate sequence.
+///
+/// # Arguments
+///
+/// * `unitary` - A `DOmegaUnitary` to decompose
+///
+/// # Returns
+///
+/// A string representing the gate sequence in normal form.
+///
+/// # Algorithm
+///
+/// 1. Iteratively reduces the denominator exponent to 0 using `reduce_denomexp`
+/// 2. Handles the remaining T-gate if needed
+/// 3. Decomposes the remaining Clifford part into S, W, and X gates
+/// 4. Converts the result to normal form for optimization
+///
+/// # Panics
+///
+/// Panics if the decomposition fails (i.e., doesn't reduce to identity).
 pub fn decompose_domega_unitary(mut unitary: DOmegaUnitary) -> String {
     let omega_power: [ZOmega; 8] = [
         ZOmega::new(IBig::ZERO, IBig::ZERO, IBig::ZERO, IBig::ONE),

@@ -14,6 +14,12 @@ use std::fmt::{Display, Formatter, Result};
 use std::mem;
 use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 
+/// Represents an element of Z[ω] where ω = exp(iπ/4).
+///
+/// Elements are represented as a + bω + cω² + dω³ where a, b, c, d ∈ Z.
+/// This is the ring of cyclotomic integers used in the GridSynth algorithm.
+///
+/// Various computed properties are cached for performance.
 #[derive(Clone, Eq)]
 pub struct ZOmega {
     pub a: IBig,
@@ -29,6 +35,18 @@ pub struct ZOmega {
 }
 
 impl ZOmega {
+    /// Creates a new element of Z[ω].
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - Coefficient of ω³
+    /// * `b` - Coefficient of ω²
+    /// * `c` - Coefficient of ω
+    /// * `d` - Constant term
+    ///
+    /// # Returns
+    ///
+    /// An element representing a·ω³ + b·ω² + c·ω + d.
     pub fn new(a: IBig, b: IBig, c: IBig, d: IBig) -> Self {
         Self {
             a,
@@ -54,6 +72,11 @@ impl ZOmega {
         })
     }
 
+    /// Computes the complex conjugate.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the conjugate, cached for performance.
     pub fn conj(&self) -> &Self {
         self.conj_cache
             .get_or_init(|| {
@@ -67,6 +90,11 @@ impl ZOmega {
             .as_ref()
     }
 
+    /// Computes the conjugate with respect to √2.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the √2-conjugate, cached for performance.
     pub fn conj_sq2(&self) -> &Self {
         self.conj_sq2_cache
             .get_or_init(|| {
@@ -80,6 +108,11 @@ impl ZOmega {
             .as_ref()
     }
 
+    /// Computes the residue (parity bits) of the coefficients.
+    ///
+    /// # Returns
+    ///
+    /// A 4-bit value encoding the parity of each coefficient, cached for performance.
     pub fn residue(&self) -> u8 {
         *self.residue_cache.get_or_init(|| {
             (u8::try_from(&(&self.a & 1)).unwrap() << 3)
@@ -89,6 +122,11 @@ impl ZOmega {
         })
     }
 
+    /// Computes the norm of the element.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the norm N(x) = x · conj(x), cached for performance.
     pub fn norm(&self) -> &IBig {
         self.norm_cache.get_or_init(|| {
             let (a, b, c, d) = (&self.a, &self.b, &self.c, &self.d);
@@ -98,18 +136,46 @@ impl ZOmega {
         })
     }
 
+    /// Creates an element from an integer.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - An integer value
+    ///
+    /// # Returns
+    ///
+    /// An element representing the integer x in Z[ω].
     pub fn from_int(x: IBig) -> Self {
         Self::new(IBig::ZERO, IBig::ZERO, IBig::ZERO, x)
     }
 
+    /// Converts an element from Z[√2] to Z[ω].
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - An element of Z[√2]
+    ///
+    /// # Returns
+    ///
+    /// The corresponding element in Z[ω].
     pub fn from_zroottwo(x: &ZRootTwo) -> Self {
         Self::new(-x.b.clone(), IBig::ZERO, x.b.clone(), x.a.clone())
     }
 
+    /// Computes the real part as a high-precision floating-point number.
+    ///
+    /// # Returns
+    ///
+    /// The real part of the complex number represented by this element.
     pub fn real(&self) -> FBig<HalfEven> {
         ib_to_bf_prec(self.d.clone()) + sqrt2() * (&self.c - &self.a) / 2
     }
 
+    /// Computes the imaginary part as a high-precision floating-point number.
+    ///
+    /// # Returns
+    ///
+    /// The imaginary part of the complex number represented by this element.
     pub fn imag(&self) -> FBig<HalfEven> {
         ib_to_bf_prec(self.b.clone()) + sqrt2() * (&self.c + &self.a) / 2
     }
@@ -151,6 +217,15 @@ impl ZOmega {
         )
     }
 
+    /// Performs division with remainder in Z[ω].
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The divisor
+    ///
+    /// # Returns
+    ///
+    /// A tuple `(quotient, remainder)` such that self = other × quotient + remainder.
     pub fn divmod(&self, other: &Self) -> (Self, Self) {
         let p0 = self * other.conj();
         let p1 = other.conj().conj_sq2() * other.conj_sq2();
@@ -166,6 +241,16 @@ impl ZOmega {
         (q, r)
     }
 
+    /// Computes the extended GCD in Z[ω].
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - First element
+    /// * `b` - Second element
+    ///
+    /// # Returns
+    ///
+    /// A tuple `(x, z, gcd)` where gcd = gcd(a, b) and x·a + z·b = gcd.
     pub fn ext_gcd(mut a: Self, mut b: Self) -> (Self, Self, Self) {
         let mut x = ZOmega::from_int(IBig::ONE);
         let mut y = ZOmega::from_int(IBig::ZERO);
@@ -191,10 +276,29 @@ impl ZOmega {
         (x, z, a)
     }
 
+    /// Computes the greatest common divisor in Z[ω].
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - First element
+    /// * `b` - Second element
+    ///
+    /// # Returns
+    ///
+    /// The GCD of a and b.
     pub fn gcd(a: Self, b: Self) -> Self {
         Self::ext_gcd(a, b).2
     }
 
+    /// Raises the element to a power using binary exponentiation.
+    ///
+    /// # Arguments
+    ///
+    /// * `n` - The exponent
+    ///
+    /// # Returns
+    ///
+    /// self^n computed efficiently.
     pub fn pow(self, n: u32) -> Self {
         match n {
             0 => Self::from_int(IBig::ONE),

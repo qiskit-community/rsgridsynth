@@ -13,6 +13,10 @@ use std::fmt;
 use std::hash::Hash;
 use std::ops::{Add, AddAssign, Div, Mul, Neg, Rem, Sub};
 
+/// Represents an element of Z[√2], the ring of integers extended by √2.
+///
+/// Elements are represented as a + b√2 where a, b ∈ Z.
+/// This ring is used extensively in the GridSynth algorithm.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ZRootTwo {
     pub(crate) a: IBig,
@@ -45,10 +49,29 @@ pub const LAMBDA: ZRootTwo = ZRootTwo {
 };
 
 impl ZRootTwo {
+    /// Creates a new element of Z[√2].
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - The rational part
+    /// * `b` - The coefficient of √2
+    ///
+    /// # Returns
+    ///
+    /// An element representing a + b√2.
     pub fn new(a: IBig, b: IBig) -> Self {
         Self { a, b }
     }
 
+    /// Creates an element from an integer.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - An integer value
+    ///
+    /// # Returns
+    ///
+    /// An element representing x in Z[√2].
     pub fn from_int(x: IBig) -> Self {
         Self {
             a: x,
@@ -63,18 +86,38 @@ impl ZRootTwo {
         }
     }
 
+    /// Returns the parity (least significant bit) of the rational part.
+    ///
+    /// # Returns
+    ///
+    /// 0 if a is even, 1 if a is odd.
     pub fn parity(&self) -> IBig {
         &self.a & IBig::ONE
     }
 
+    /// Computes the norm of the element.
+    ///
+    /// # Returns
+    ///
+    /// The norm N(a + b√2) = a² - 2b².
     pub fn norm(&self) -> IBig {
         &self.a * &self.a - IBig::from(2) * &self.b * &self.b
     }
 
+    /// Converts to a high-precision floating-point number.
+    ///
+    /// # Returns
+    ///
+    /// The real value a + b√2 as a floating-point number.
     pub fn to_real(&self) -> FBig<HalfEven> {
         &self.a + sqrt2() * &self.b
     }
 
+    /// Computes the conjugate with respect to √2.
+    ///
+    /// # Returns
+    ///
+    /// The conjugate a - b√2.
     pub fn conj_sq2(&self) -> Self {
         Self {
             a: self.a.clone(),
@@ -82,6 +125,15 @@ impl ZRootTwo {
         }
     }
 
+    /// Computes the multiplicative inverse if it exists.
+    ///
+    /// # Returns
+    ///
+    /// The inverse element.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the norm is not ±1 (element is not a unit).
     pub fn inv(&self) -> Self {
         let norm = self.norm();
         if norm == IBig::ONE {
@@ -96,6 +148,19 @@ impl ZRootTwo {
         }
     }
 
+    /// Converts an element from Z[ω] to Z[√2] if possible.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - An element of Z[ω]
+    ///
+    /// # Returns
+    ///
+    /// The corresponding element in Z[√2].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the element cannot be represented in Z[√2].
     pub fn from_zomega(x: ZOmega) -> Self {
         if x.b == IBig::ZERO && x.a == -&x.c {
             Self::new(x.d, x.c)
@@ -104,6 +169,11 @@ impl ZRootTwo {
         }
     }
 
+    /// Computes the square root if it exists in Z[√2].
+    ///
+    /// # Returns
+    ///
+    /// `Some(w)` where w² = self, or `None` if no such element exists.
     pub fn sqrt(&self) -> Option<Self> {
         let norm = ib_to_bf_prec(self.norm());
         if norm < ib_to_bf_prec(IBig::ZERO) || self.a < IBig::ZERO {
@@ -131,11 +201,31 @@ impl ZRootTwo {
         }
     }
 
+    /// Checks if two elements are similar (associates).
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - First element
+    /// * `b` - Second element
+    ///
+    /// # Returns
+    ///
+    /// `true` if a and b divide each other (are associates).
     pub fn sim(a: Self, b: Self) -> bool {
         a.clone() % b.clone() == ZRootTwo::from_int(IBig::ZERO)
             && b % a == ZRootTwo::from_int(IBig::ZERO)
     }
 
+    /// Computes the extended GCD in Z[√2].
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - First element
+    /// * `b` - Second element
+    ///
+    /// # Returns
+    ///
+    /// A tuple `(x, z, gcd)` where gcd = gcd(a, b) and x·a + z·b = gcd.
     pub fn ext_gcd(mut a: Self, mut b: Self) -> (Self, Self, Self) {
         let mut x = ZRootTwo::from_int(IBig::ONE);
         let mut y = ZRootTwo::from_int(IBig::ZERO);
@@ -158,11 +248,30 @@ impl ZRootTwo {
         (x, z, a)
     }
 
+    /// Computes the greatest common divisor in Z[√2].
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - First element
+    /// * `b` - Second element
+    ///
+    /// # Returns
+    ///
+    /// The GCD of a and b.
     pub fn gcd(a: Self, b: Self) -> Self {
         let (_, _, g) = Self::ext_gcd(a, b);
         g
     }
 
+    /// Raises the element to a power using binary exponentiation.
+    ///
+    /// # Arguments
+    ///
+    /// * `exp` - The exponent (can be negative for units)
+    ///
+    /// # Returns
+    ///
+    /// self^exp computed efficiently.
     pub fn pow(&self, exp: &IBig) -> Self {
         if *exp < IBig::ZERO {
             return self.inv().pow(&(-exp));
@@ -342,6 +451,16 @@ impl PartialOrd for ZRootTwo {
     }
 }
 
+/// Performs division with remainder in Z[√2].
+///
+/// # Arguments
+///
+/// * `x` - The dividend
+/// * `y` - The divisor
+///
+/// # Returns
+///
+/// A tuple `(quotient, remainder)` such that x = y × quotient + remainder.
 pub fn divmod(x: &ZRootTwo, y: &ZRootTwo) -> (ZRootTwo, ZRootTwo) {
     let p = x * &y.conj_sq2();
     let k = y.norm();

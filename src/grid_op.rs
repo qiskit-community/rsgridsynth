@@ -15,6 +15,9 @@ use std::{
     ops::{Mul, MulAssign},
 };
 
+/// A pair of ellipses used in the GridSynth algorithm.
+///
+/// Represents two ellipses that are transformed together during the synthesis process.
 #[derive(Debug, Clone)]
 pub struct EllipsePair {
     pub a: Ellipse,
@@ -22,14 +25,30 @@ pub struct EllipsePair {
 }
 
 impl EllipsePair {
+    /// Creates a new ellipse pair.
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - The first ellipse
+    /// * `b` - The second ellipse
     pub fn new(a: Ellipse, b: Ellipse) -> Self {
         Self { a, b }
     }
 
+    /// Computes the total skew of both ellipses.
+    ///
+    /// # Returns
+    ///
+    /// The sum of the skew values of both ellipses.
     pub fn skew(&self) -> FBig<HalfEven> {
         self.a.skew() + self.b.skew()
     }
 
+    /// Computes the bias ratio between the two ellipses.
+    ///
+    /// # Returns
+    ///
+    /// The ratio of the second ellipse's bias to the first ellipse's bias.
     pub fn bias(&self) -> FBig<HalfEven> {
         self.b.bias() / self.a.bias()
     }
@@ -42,6 +61,11 @@ impl Mul<EllipsePair> for GridOp {
     }
 }
 
+/// A grid operator representing a 2×2 matrix over Z[ω].
+///
+/// Grid operators are used to transform points and ellipses in the GridSynth algorithm.
+/// The operator is represented by two column vectors u0 and u1 in Z[ω].
+/// Several computed properties are cached for performance.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GridOp {
     pub u0: ZOmega,
@@ -53,6 +77,12 @@ pub struct GridOp {
 }
 
 impl GridOp {
+    /// Creates a new grid operator from two column vectors.
+    ///
+    /// # Arguments
+    ///
+    /// * `u0` - The first column vector in Z[ω]
+    /// * `u1` - The second column vector in Z[ω]
     pub fn new(u0: ZOmega, u1: ZOmega) -> Self {
         Self {
             u0,
@@ -89,17 +119,32 @@ impl GridOp {
         &self.u1.d
     }
 
+    /// Computes the determinant vector of the grid operator.
+    ///
+    /// # Returns
+    ///
+    /// The determinant computed as conj(u0) * u1, cached for performance.
     pub fn det_vec(&self) -> ZOmega {
         self.det_vec_cache
             .get_or_init(|| self.u0.conj() * &self.u1)
             .clone()
     }
 
+    /// Checks if this is a special grid operator.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the determinant vector v satisfies v.a + v.c = 0 and v.b = ±1.
     pub fn is_special(&self) -> bool {
         let v = self.det_vec();
         v.a + v.c == IBig::ZERO && (v.b == IBig::ONE || v.b == IBig::NEG_ONE)
     }
 
+    /// Converts the grid operator to a 2×2 matrix of floating-point numbers.
+    ///
+    /// # Returns
+    ///
+    /// A 2×2 array where the first row contains real parts and the second row contains imaginary parts.
     pub fn to_mat(&self) -> [[FBig<HalfEven>; 2]; 2] {
         [
             [self.u0.real(), self.u1.real()],
@@ -107,6 +152,15 @@ impl GridOp {
         ]
     }
 
+    /// Computes the inverse of this grid operator if it exists.
+    ///
+    /// # Returns
+    ///
+    /// `Some(inverse)` if the operator is special (and thus invertible), `None` otherwise.
+    ///
+    /// # Note
+    ///
+    /// The result is cached for performance.
     pub fn inv(&self) -> Option<Self> {
         self.inv_cache
             .get_or_init(|| {
@@ -131,6 +185,11 @@ impl GridOp {
             .map(|b| *b)
     }
 
+    /// Computes the adjoint (conjugate transpose) of this grid operator.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the adjoint operator, cached for performance.
     pub fn adj(&self) -> &Self {
         self.adj_cache
             .get_or_init(|| {
@@ -147,6 +206,11 @@ impl GridOp {
             .as_ref()
     }
 
+    /// Computes the conjugate with respect to √2.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the conjugated operator, cached for performance.
     pub fn conj_sq2(&self) -> &Self {
         self.conj_sq2_cache
             .get_or_init(|| {
