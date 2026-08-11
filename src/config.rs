@@ -1,5 +1,6 @@
 use crate::common::ib_to_bf_prec;
 use crate::common::{reset_prec_bits, set_prec_bits};
+use crate::gate::GateSeq;
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::{IBig, UBig};
@@ -27,8 +28,8 @@ pub struct GridSynthConfig {
 /// computed here -- call [`crate::accuracy::AchievedDiamondError::achieved_diamond_error`] on
 /// demand instead.
 pub struct GridSynthResult {
-    /// List of gates.
-    pub gates: String,
+    /// The synthesized gate sequence. An empty sequence represents the identity.
+    pub gates: GateSeq,
 
     /// The global phase factor.
     pub global_phase: bool,

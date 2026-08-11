@@ -25,6 +25,7 @@ use crate::accuracy::{
 };
 use crate::common::{cos_fbig, fb_with_prec, ib_to_bf_prec, sin_fbig};
 use crate::config::config_from_theta_epsilon;
+use crate::gate::{Gate, GateSeq};
 use crate::gridsynth::{
     search_for_solution, setup_regions_and_transform, EpsilonRegion, PhaseMode, UnitDisk,
 };
@@ -386,16 +387,17 @@ pub(crate) fn half_angle_cos_sin(
     (cos_half, sin_half)
 }
 
-/// The output of [`synth_fallback`]: gate strings for the projective step and its (rare)
+/// The output of [`synth_fallback`]: gate sequences for the projective step and its (rare)
 /// classical correction, plus the `q` threshold used. Call
 /// [`FallbackResult::achieved_success_probability`] or
 /// [`AchievedDiamondError::achieved_diamond_error`] to compute accuracy on demand.
+#[derive(Debug, Clone)]
 pub struct FallbackResult {
-    /// Gate string for the projective/fallback step, applied unconditionally.
-    pub projective_gates: String,
-    /// Gate string for the classical correction, applied only on the "failure" branch
+    /// Gate sequence for the projective/fallback step, applied unconditionally.
+    pub projective_gates: GateSeq,
+    /// Gate sequence for the classical correction, applied only on the "failure" branch
     /// (probability `1 - achieved_success_probability()`).
-    pub correction_gates: String,
+    pub correction_gates: GateSeq,
     /// The `q` threshold used to find the projective candidate.
     pub q: DRootTwo,
 }
@@ -427,7 +429,7 @@ impl FallbackResult {
 /// residual angle in the first place. Shared by [`residual_diamond_error`] (a single
 /// correction gate string) and [`residual_diamond_error_mixed`] (a `MixedDiagonalResult`
 /// correction, e.g. mixed fallback's).
-pub(crate) fn residual_wframe(theta: &FBig<HalfEven>, projective_gates: &str) -> WFrame {
+pub(crate) fn residual_wframe(theta: &FBig<HalfEven>, projective_gates: &[Gate]) -> WFrame {
     let v = DOmegaUnitary::from_gates(projective_gates).w().clone();
     let (cos_phi, sin_phi, _) = phase_cos_sin(&v);
     let (cos_half_phi, sin_half_phi) = half_angle_cos_sin(&cos_phi, &sin_phi);
@@ -453,8 +455,8 @@ pub(crate) fn residual_wframe(theta: &FBig<HalfEven>, projective_gates: &str) ->
 /// angle.
 pub(crate) fn residual_diamond_error(
     theta: &FBig<HalfEven>,
-    projective_gates: &str,
-    correction_gates: &str,
+    projective_gates: &[Gate],
+    correction_gates: &[Gate],
 ) -> FBig<HalfEven> {
     let wframe = residual_wframe(theta, projective_gates);
     let u = DOmegaUnitary::from_gates(correction_gates);
@@ -471,7 +473,7 @@ pub(crate) fn residual_diamond_error(
 /// residual target.
 pub(crate) fn residual_diamond_error_mixed(
     theta: &FBig<HalfEven>,
-    projective_gates: &str,
+    projective_gates: &[Gate],
     correction: &crate::protocol::mixed_diagonal::MixedDiagonalResult,
 ) -> FBig<HalfEven> {
     let wframe = residual_wframe(theta, projective_gates);
@@ -825,16 +827,8 @@ mod tests {
                     continue;
                 };
 
-                let projective_t = result
-                    .projective_gates
-                    .chars()
-                    .filter(|&c| c == 'T')
-                    .count();
-                let correction_t = result
-                    .correction_gates
-                    .chars()
-                    .filter(|&c| c == 'T')
-                    .count();
+                let projective_t = result.projective_gates.t_count();
+                let correction_t = result.correction_gates.t_count();
 
                 let p_f64 = match result.achieved_success_probability().to_f64() {
                     dashu_base::Approximation::Exact(v) => v,

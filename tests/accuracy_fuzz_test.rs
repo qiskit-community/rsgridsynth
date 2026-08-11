@@ -24,6 +24,7 @@ use rsgridsynth::accuracy::AchievedDiamondError;
 use rsgridsynth::clear_caches;
 use rsgridsynth::common::{cos_fbig, fb_with_prec, get_prec_bits, sin_fbig};
 use rsgridsynth::config::config_from_theta_epsilon;
+use rsgridsynth::gate::Gate;
 use rsgridsynth::gridsynth::gridsynth_gates;
 use rsgridsynth::unitary::DOmegaUnitary;
 use serial_test::serial;
@@ -48,7 +49,7 @@ fn fbig_to_f64(x: &FBig<HalfEven>) -> f64 {
 /// not a copy of it. `shifted` selects whether the synthesized unitary should be compared up to
 /// the extra global phase `e^{i pi/8}` (this crate's `PhaseMode`), matching
 /// `GridSynthResult::global_phase`.
-fn independent_operator_error(gates: &str, theta: &FBig<HalfEven>, shifted: bool) -> f64 {
+fn independent_operator_error(gates: &[Gate], theta: &FBig<HalfEven>, shifted: bool) -> f64 {
     let two = fb_with_prec(FBig::try_from(2.0).unwrap());
     let neg_theta_half = -fb_with_prec(theta / &two);
     let z_x = fb_with_prec(cos_fbig(&neg_theta_half));

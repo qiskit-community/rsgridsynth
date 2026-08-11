@@ -35,7 +35,12 @@ fn simple_test() {
         let mut gridsynth_config =
             config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
         let gates = gridsynth_gates(&mut gridsynth_config).gates;
-        assert_eq!(gates, expected_gates, "Test failed for seed: {}", seed);
+        assert_eq!(
+            gates.to_string(),
+            expected_gates,
+            "Test failed for seed: {}",
+            seed
+        );
     }
 }
 
@@ -57,7 +62,7 @@ fn pi_over_two_test() {
                 config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
             let gates = gridsynth_gates(&mut gridsynth_config).gates;
             let expected_gates = "SWWWWWWW";
-            assert_eq!(gates, expected_gates);
+            assert_eq!(gates.to_string(), expected_gates);
         }
     }
 }
@@ -77,7 +82,7 @@ fn pi_over_4_exact_test() {
     let gates = gridsynth_gates(&mut gridsynth_config).gates;
     let expected_gates = "SHTSHTHTSHTSHTHTSHTHTHTSHTSHTSHTHTSHTSHTHTHTSHTSHTSHTHTHTSHTHTSHTSHTSHTSHTSHTSHTSHTHTHTHTSHTHTHTHTHTHTSHTSHTHTHTSHTSHTHTHTHTSHTSHTHTSHTSHTSHTHTSHTHTHTSHTSHTHTSHTSHTSHTHTSHTHTHTSHTHTHTSHTSHTSHTSHTHTHTHTHTSHTSHTSHTHTSHTSHTHTSHTHTSHTHTHTHTSHTSHTHTSHTSHTSHTHTSHTSHTSHTHTSHTHTHTSHTHTHTSHTSHTHTSHTSHTHTSHTSHTSHTHTHTSHTSHTSHTSHTHTHTHTSHTHTHTHTHTSHTSHTHTSHSWW";
 
-    assert_eq!(gates, expected_gates);
+    assert_eq!(gates.to_string(), expected_gates);
 }
 
 #[test]
@@ -94,7 +99,22 @@ fn pi_over_4_with_phase_test() {
         config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
     let gates = gridsynth_gates(&mut gridsynth_config).gates;
     let expected_gates = "TWWWWWWW";
-    assert_eq!(gates, expected_gates);
+    assert_eq!(gates.to_string(), expected_gates);
+}
+
+/// Pins the user-visible contract that a synthesized result's printed (`Display`) form is
+/// always re-readable via `GateSeq::from_str` -- the CLI's whole output contract rests on this.
+#[test]
+#[serial]
+fn public_api_gates_round_trip_through_display_and_parse() {
+    let theta = std::f64::consts::PI / 8.0;
+    let epsilon = 1e-10;
+    clear_caches();
+    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, 1234, false, false);
+    let res = gridsynth_gates(&mut gridsynth_config);
+
+    let round_tripped: rsgridsynth::gate::GateSeq = res.gates.to_string().parse().unwrap();
+    assert_eq!(round_tripped, res.gates);
 }
 
 #[test]

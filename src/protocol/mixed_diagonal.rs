@@ -15,9 +15,11 @@ use crate::accuracy::{diagonal_diamond_distance, AchievedDiamondError, WFrame};
 use crate::common::{cos_fbig, fb_with_prec, get_prec_bits, ib_to_bf_prec, sin_fbig};
 use crate::config::{config_from_theta_epsilon, GridSynthConfig};
 use crate::diophantine::diophantine_dyadic;
+use crate::gate::GateSeq;
 use crate::gridsynth::{process_solution_candidate, setup_regions_and_transform, PhaseMode};
 use crate::gridsynth::{UnitDisk, UprightTransform};
 use crate::math::{solve_quadratic, sqrt_fbig};
+use crate::normal_form::{Clifford, NormalForm};
 use crate::protocol::mixing::{diamond_to_spec_epsilon, mixture_weight};
 use crate::region::Ellipse;
 use crate::ring::{DOmega, DRootTwo, ZRootTwo};
@@ -352,6 +354,13 @@ pub(crate) fn search_for_straddling_pair<A: Region + std::fmt::Debug>(
 /// Since `omega^2` is a primitive 4th root of unity (regardless of this crate's `omega` sign
 /// convention), `w.mul_by_omega_power(2*m)` for `m in 0..4` realizes all four phases on `w`
 /// as an unordered set.
+/// Kept as the canonical, directly-from-the-matrix definition of the twirl even though
+/// production code (`assemble_result`, via [`twirl_variant_gates`]) no longer calls it --
+/// [`relabel_by_twirl`] is a *derived* shortcut, and this function is what
+/// `relabel_by_twirl_matches_independent_decomposition` checks it against. Hence
+/// `#[allow(dead_code)]` rather than deleting it: it is dead in the non-test build only, not
+/// unused.
+#[allow(dead_code)]
 pub(crate) fn twirl_variants(u: &DOmegaUnitary) -> [DOmegaUnitary; 4] {
     std::array::from_fn(|m| {
         let twirled_w = u.w().mul_by_omega_power(2 * m);
@@ -359,11 +368,53 @@ pub(crate) fn twirl_variants(u: &DOmegaUnitary) -> [DOmegaUnitary; 4] {
     })
 }
 
-/// One weighted branch of a [`MixedDiagonalResult`]: a Clifford+T gate string and the
+/// Cheap replacement for `decompose_domega_unitary(twirl_variants(u)[m])`: `twirl_variants`'s
+/// `m`-th variant is exactly `S^m * U * (S^m)^-1` (verified by
+/// `twirl_variants_preserve_top_left_entry_exactly` and re-derived in this function's own
+/// doc), and conjugating a unitary by a fixed Clifford is, at the *gate-word* level, exactly
+/// conjugating the word: build `S^m ++ base_gates ++ (S^m)^-1` and re-run it through the
+/// already-public, already-tested `NormalForm::from_gates`/`to_gates` normalization. This
+/// reuses the crate's existing Matsumoto-Amano machinery instead of re-running
+/// `decompose_domega_unitary`'s number-theoretic `k`-reduction loop (`reduce_denomexp`'s
+/// arbitrary-precision ring arithmetic) a second time for a result that's already known --
+/// only `O(gates.len())` `u8`-table lookups, no `DOmega`/`ZOmega` arithmetic at all.
+///
+/// `m = 0` returns `base_gates` unchanged (`S^0 = I`) -- callers should special-case it to skip
+/// the no-op round trip rather than rely on this function, since `S^0`'s `to_gates()` is empty
+/// but `NormalForm::from_gates` would still re-walk and re-normalize the whole word for no
+/// benefit.
+///
+/// Exactness: this computes the *true* Matsumoto-Amano normal form of `S^m * U * (S^m)^-1`,
+/// not an approximation -- `assemble_result`'s
+/// `relabel_by_twirl_matches_independent_decomposition` test below asserts byte-for-byte
+/// equality against independent decomposition of `twirl_variants`, across many `(theta,
+/// epsilon)` pairs, before this function was ever used in `assemble_result`.
+pub(crate) fn relabel_by_twirl(base_gates: &GateSeq, m: usize) -> GateSeq {
+    let c_m = Clifford::new(0, 0, m as i32, 0); // S^m
+    let mut word = c_m.to_gates();
+    word.extend(base_gates);
+    word.extend(&c_m.inv().to_gates());
+    NormalForm::from_gates(&word).to_gates()
+}
+
+/// All four twirl variants' gate sequences, decomposing the (`m = 0`) base candidate once and
+/// cheaply relabeling the other three via [`relabel_by_twirl`].
+fn twirl_variant_gates(u: DOmegaUnitary) -> [GateSeq; 4] {
+    let base = decompose_domega_unitary(u);
+    std::array::from_fn(|m| {
+        if m == 0 {
+            base.clone()
+        } else {
+            relabel_by_twirl(&base, m)
+        }
+    })
+}
+
+/// One weighted branch of a [`MixedDiagonalResult`]: a Clifford+T gate sequence and the
 /// classical probability with which the mixed channel applies it.
 #[derive(Debug, Clone)]
 pub struct MixedDiagonalBranch {
-    pub gates: String,
+    pub gates: GateSeq,
     pub weight: FBig<HalfEven>,
 }
 
@@ -473,16 +524,21 @@ pub(crate) fn assemble_result(outcome: StraddleOutcome, wframe: &WFrame) -> Mixe
             let p_over_4 = fb_with_prec(&mw.p / &four);
             let one_minus_p_over_4 = fb_with_prec(&one_minus_p / &four);
 
+            // Decompose the untwirled candidate once per side and cheaply relabel the other
+            // three variants (`relabel_by_twirl`), instead of independently re-running
+            // `decompose_domega_unitary`'s number-theoretic `k`-reduction loop 8 times total.
+            // Exactness is proved once, ahead of this call site, by
+            // `relabel_by_twirl_matches_independent_decomposition` above.
             let mut branches = Vec::with_capacity(8);
-            for variant in twirl_variants(&lo) {
+            for gates in twirl_variant_gates(lo) {
                 branches.push(MixedDiagonalBranch {
-                    gates: decompose_domega_unitary(variant),
+                    gates,
                     weight: p_over_4.clone(),
                 });
             }
-            for variant in twirl_variants(&hi) {
+            for gates in twirl_variant_gates(hi) {
                 branches.push(MixedDiagonalBranch {
-                    gates: decompose_domega_unitary(variant),
+                    gates,
                     weight: one_minus_p_over_4.clone(),
                 });
             }
@@ -807,6 +863,67 @@ mod tests {
         }
     }
 
+    /// The load-bearing correctness proof for [`relabel_by_twirl`], run *before* it is ever
+    /// used in `assemble_result` below: for real solved candidates (from a genuine
+    /// `search_for_straddling_pair` call, not synthetic numbers), every one of its three
+    /// nontrivial outputs (`m = 1, 2, 3`) must be byte-for-byte identical to independently
+    /// calling `decompose_domega_unitary` on `twirl_variants(u)[m]` -- the expensive path this
+    /// function replaces. Also pins the T-count invariant (`assemble_result`'s cheap
+    /// pre-filter, if this ever regresses it fails loudest here first) across several
+    /// `(theta, epsilon)` pairs spanning coarse to fine tolerances.
+    #[test]
+    #[serial]
+    fn relabel_by_twirl_matches_independent_decomposition() {
+        let cases: [(f64, f64, u64); 4] = [
+            (3.0 * PI / 32.0, 1e-6, 99),
+            (0.7, 1e-4, 7),
+            (2.222, 1e-8, 13),
+            (5.9, 1e-10, 21),
+        ];
+        for (theta_f64, epsilon, seed) in cases {
+            crate::clear_caches();
+            let (region, unit_disk, transformed, wframe, mut config) =
+                setup(theta_f64, epsilon, seed);
+            let phase_tolerance = config.epsilon.clone();
+            let outcome = search_for_straddling_pair(
+                &region,
+                &unit_disk,
+                &transformed,
+                &mut config,
+                &wframe,
+                &phase_tolerance,
+            );
+            let (lo, hi) = match outcome {
+                StraddleOutcome::Mixed(lo, hi) => (lo, *hi),
+                StraddleOutcome::Unmixed(_) => continue, // no twirl to check at this tolerance
+                other => panic!("expected Mixed or Unmixed, got {other:?}"),
+            };
+
+            for original in [lo, hi] {
+                let base_gates = decompose_domega_unitary(original.clone());
+                for m in 0..4 {
+                    let expected = decompose_domega_unitary(twirl_variants(&original)[m].clone());
+                    let actual = if m == 0 {
+                        base_gates.clone()
+                    } else {
+                        relabel_by_twirl(&base_gates, m)
+                    };
+                    assert_eq!(
+                        actual, expected,
+                        "theta={theta_f64} eps={epsilon} seed={seed} m={m}: relabel_by_twirl \
+                         disagrees with independent decomposition\n  actual:   {actual}\n  \
+                         expected: {expected}"
+                    );
+                    assert_eq!(
+                        actual.t_count(),
+                        base_gates.t_count(),
+                        "theta={theta_f64} eps={epsilon} seed={seed} m={m}: twirl changed T-count"
+                    );
+                }
+            }
+        }
+    }
+
     // ---- Task 4: public entry point and validation ----
 
     // Required test 2: "absolute oracle" -- re-verify, using REAL solved candidates from the
@@ -952,15 +1069,8 @@ mod tests {
     // gross regression (e.g. a slope near the plain-diagonal baseline's ~3.02, which would
     // indicate the mixing isn't buying anything).
     //
-    // T-count is computed via a plain `'T'`-char count rather than
-    // `NormalForm::from_gates(..).t_count()`: `decompose_domega_unitary`'s output can, for a
-    // branch whose trailing Clifford correction happens to be trivial, legitimately contain
-    // an embedded literal `'I'` character (via `Clifford::to_gates`'s own "return \"I\" if
-    // empty" convention leaking into `NormalForm::to_gates`'s concatenation of the syllable
-    // prefix with the Clifford suffix) that `NormalForm::from_gates` cannot parse back
-    // (`append_gate` only recognizes H/S/X/W/T) -- a pre-existing gap in `src/normal_form.rs`,
-    // which is out of scope to fix here (only `mixed_diagonal.rs` is mine to edit). Since the
-    // task spec explicitly allows either method, the char-count form sidesteps it entirely.
+    // T-count is `GateSeq::t_count()`, which counts `Gate::T` occurrences directly -- no
+    // string round-trip through `NormalForm` needed.
     #[test]
     #[serial]
     fn slope_fit_cost_vs_log2_inv_epsilon() {
@@ -986,7 +1096,7 @@ mod tests {
                 let result = synth_mixed_diagonal(theta, eps, seed, false);
                 let mut cost = 0.0;
                 for branch in &result.branches {
-                    let t_count = branch.gates.chars().filter(|&c| c == 'T').count() as f64;
+                    let t_count = branch.gates.t_count() as f64;
                     cost += fbig_to_f64(&branch.weight) * t_count;
                 }
                 total_cost += cost;

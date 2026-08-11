@@ -4,11 +4,28 @@
 use std::fmt::{Debug, Display, Formatter, Result};
 use std::ops::Mul;
 
+use crate::gate::{Gate, GateSeq};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Axis {
     I = 0,
     H = 1,
     SH = 2,
+}
+
+impl Axis {
+    /// Gate expansion of this coset representative, in left-to-right (application) order.
+    ///
+    /// This is the explicit replacement for relying on `format!("{:?}", axis)` spelling a valid
+    /// gate string (`Axis::SH`'s `Debug` output happens to be `"SH"`) -- a coupling that would
+    /// silently corrupt output if a variant were ever renamed.
+    pub(crate) const fn gates(self) -> &'static [Gate] {
+        match self {
+            Axis::I => &[],
+            Axis::H => &[Gate::H],
+            Axis::SH => &[Gate::S, Gate::H],
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,6 +34,20 @@ pub enum Syllable {
     T = 1,
     HT = 2,
     SHT = 3,
+}
+
+impl Syllable {
+    /// Gate expansion of this syllable. Every non-`I` variant contains exactly one `Gate::T` --
+    /// the invariant `GateSeq::t_count`/`NormalForm::t_count` rely on agreeing with each other.
+    /// See [`Axis::gates`] for why this replaces `Debug`-formatting.
+    pub(crate) const fn gates(self) -> &'static [Gate] {
+        match self {
+            Syllable::I => &[],
+            Syllable::T => &[Gate::T],
+            Syllable::HT => &[Gate::H, Gate::T],
+            Syllable::SHT => &[Gate::S, Gate::H, Gate::T],
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,20 +99,15 @@ impl Clifford {
         )
     }
 
-    pub fn to_gates(&self) -> String {
+    pub fn to_gates(&self) -> GateSeq {
         let (axis, c) = self.decompose_coset();
-        let mut gates = match axis {
-            Axis::I => String::new(),
-            _ => format!("{:?}", axis),
-        };
-        gates += &"X".repeat(c.b as usize);
-        gates += &"S".repeat(c.c as usize);
-        gates += &"W".repeat(c.d as usize);
-        if gates.is_empty() {
-            "I".to_string()
-        } else {
-            gates
-        }
+        let mut gates =
+            GateSeq::with_capacity(axis.gates().len() + c.b as usize + c.c as usize + c.d as usize);
+        gates.extend(axis.gates());
+        gates.push_n(Gate::X, c.b as usize);
+        gates.push_n(Gate::S, c.c as usize);
+        gates.push_n(Gate::W, c.d as usize);
+        gates
     }
 
     // pub fn from_str(g: &str) -> Self {
@@ -129,13 +155,13 @@ impl NormalForm {
         }
     }
 
-    fn append_gate(&mut self, g: &str) {
+    fn append_gate(&mut self, g: Gate) {
         match g {
-            "H" => self.c = self.c * CLIFFORD_H,
-            "S" => self.c = self.c * CLIFFORD_S,
-            "X" => self.c = self.c * CLIFFORD_X,
-            "W" => self.c = self.c * CLIFFORD_W,
-            "T" => {
+            Gate::H => self.c = self.c * CLIFFORD_H,
+            Gate::S => self.c = self.c * CLIFFORD_S,
+            Gate::X => self.c = self.c * CLIFFORD_X,
+            Gate::W => self.c = self.c * CLIFFORD_W,
+            Gate::T => {
                 let (axis, new_c) = self.c.decompose_tconj();
                 match axis {
                     Axis::I => {
@@ -172,31 +198,24 @@ impl NormalForm {
                     }
                 }
             }
-            _ => panic!("Unsupported gate"),
         }
     }
 
-    pub fn from_gates(gates: &str) -> Self {
+    pub fn from_gates(gates: &[Gate]) -> Self {
         let mut nf = Self::new();
-        for ch in gates.chars() {
-            nf.append_gate(&ch.to_string());
+        for &g in gates {
+            nf.append_gate(g);
         }
         nf
     }
 
-    pub fn to_gates(&self) -> String {
-        let mut gates = String::new();
+    pub fn to_gates(&self) -> GateSeq {
+        let mut gates = GateSeq::with_capacity(3 * self.syllables.len() + 8);
         for s in &self.syllables {
-            if *s != Syllable::I {
-                gates += &format!("{:?}", s);
-            }
+            gates.extend(s.gates());
         }
-        gates += &self.c.to_gates();
-        if gates.is_empty() {
-            "I".to_string()
-        } else {
-            gates
-        }
+        gates.extend(self.c.to_gates());
+        gates
     }
 
     /// Number of T-gate applications in the Matsumoto-Amano normal form. Every syllable
@@ -204,6 +223,18 @@ impl NormalForm {
     /// so this is simply the count of non-`I` syllables.
     pub fn t_count(&self) -> usize {
         self.syllables.iter().filter(|s| **s != Syllable::I).count()
+    }
+
+    /// The T-rotation syllables, in application order, matching the grammar `T?(HT|SHT)*`:
+    /// a bare `Syllable::T` can only occur as the first element (`append_gate` merges any
+    /// later `Axis::I` case into the preceding syllable instead of pushing a second one).
+    pub fn syllables(&self) -> &[Syllable] {
+        &self.syllables
+    }
+
+    /// The trailing Clifford correction (`Clifford` is `Copy`).
+    pub fn clifford(&self) -> Clifford {
+        self.c
     }
 }
 
@@ -349,11 +380,41 @@ mod tests {
         gates.chars().filter(|&c| c == 'T').count()
     }
 
+    fn seq(s: &str) -> GateSeq {
+        s.parse().expect("test gate strings are valid gate words")
+    }
+
+    // Pins `Axis::gates`/`Syllable::gates` to the same spelling the old `format!("{:?}", _)`
+    // trick produced, so the table transcription is checked independently of the larger
+    // GateSeq migration.
+    #[test]
+    fn axis_and_syllable_gate_tables_match_debug_formatting() {
+        for (axis, debug_str) in [(Axis::I, ""), (Axis::H, "H"), (Axis::SH, "SH")] {
+            let via_table: String = axis.gates().iter().map(|g| g.as_char()).collect();
+            assert_eq!(via_table, debug_str);
+            if axis != Axis::I {
+                assert_eq!(format!("{axis:?}"), debug_str);
+            }
+        }
+        for (syllable, debug_str) in [
+            (Syllable::I, ""),
+            (Syllable::T, "T"),
+            (Syllable::HT, "HT"),
+            (Syllable::SHT, "SHT"),
+        ] {
+            let via_table: String = syllable.gates().iter().map(|g| g.as_char()).collect();
+            assert_eq!(via_table, debug_str);
+            if syllable != Syllable::I {
+                assert_eq!(format!("{syllable:?}"), debug_str);
+            }
+        }
+    }
+
     // A lone "T" does not trigger any Clifford-conjugation cancellation, so `t_count()`
     // should agree with a direct character count of the (un-normalized) input.
     #[test]
     fn t_count_matches_char_count_for_single_t() {
-        let nf = NormalForm::from_gates("T");
+        let nf = NormalForm::from_gates(&seq("T"));
         assert_eq!(nf.t_count(), manual_t_count("T"));
     }
 
@@ -369,12 +430,12 @@ mod tests {
     #[test]
     fn t_count_matches_normalized_char_count_for_repeated_t_strings() {
         for gates in ["", "T", "TT", "TTT", "TTTTTTTTTT"] {
-            let nf = NormalForm::from_gates(gates);
+            let nf = NormalForm::from_gates(&seq(gates));
             let normalized = nf.to_gates();
             assert_eq!(
                 nf.t_count(),
-                manual_t_count(&normalized),
-                "mismatch for input {gates:?}, normalized to {normalized:?}"
+                manual_t_count(&normalized.to_string()),
+                "mismatch for input {gates:?}, normalized to {normalized}"
             );
         }
     }
@@ -395,12 +456,64 @@ mod tests {
     #[test]
     fn t_count_matches_char_count_for_golden_gate_strings() {
         for gates in GOLDEN_GATES {
-            let nf = NormalForm::from_gates(gates);
+            let nf = NormalForm::from_gates(&seq(gates));
             assert_eq!(
                 nf.t_count(),
                 manual_t_count(gates),
                 "t_count mismatch for golden string {gates:?}"
             );
         }
+    }
+
+    /// The direct regression test for the fix: a trivial trailing Clifford correction
+    /// contributes nothing (not the historical `"I"` sentinel).
+    #[test]
+    fn clifford_identity_to_gates_is_empty() {
+        assert!(Clifford::new(0, 0, 0, 0).to_gates().is_empty());
+    }
+
+    /// Brute-force every input word over `{H, S, T, X, W}` up to length 5 (5^0 + .. + 5^5 =
+    /// 19531 cases, fast) and check two invariants that together prove
+    /// `NormalForm::to_gates` never produces output `NormalForm::from_gates` can't parse back
+    /// (the class of bug this migration fixes, without needing to hand-construct the specific
+    /// leaking case), and that the `t_count()`/`to_gates().t_count()` bridge invariant holds
+    /// everywhere, not just on the hand-picked golden strings above.
+    #[test]
+    fn to_gates_is_idempotent_and_t_count_bridges_for_all_short_words() {
+        fn recurse(prefix: &mut Vec<Gate>, depth: usize, max_depth: usize) {
+            if depth > 0 {
+                let seq = GateSeq::from(prefix.clone());
+                let nf = NormalForm::from_gates(&seq);
+                let rendered = nf.to_gates();
+
+                // Idempotence: re-parsing and re-rendering the normal form's own output
+                // reproduces it exactly -- in particular, `rendered` must contain no
+                // unparseable embedded 'I', or this round-trip would silently drop gates
+                // instead of matching.
+                let round_tripped = NormalForm::from_gates(&rendered).to_gates();
+                assert_eq!(
+                    round_tripped, rendered,
+                    "to_gates not idempotent for input {prefix:?} (rendered {rendered})"
+                );
+
+                // t_count bridge: structural count (non-`I` syllables) agrees with a count
+                // of `Gate::T` in the rendered sequence.
+                assert_eq!(
+                    nf.t_count(),
+                    rendered.t_count(),
+                    "t_count bridge broken for input {prefix:?} (rendered {rendered})"
+                );
+            }
+            if depth == max_depth {
+                return;
+            }
+            for g in Gate::ALL {
+                prefix.push(g);
+                recurse(prefix, depth + 1, max_depth);
+                prefix.pop();
+            }
+        }
+
+        recurse(&mut Vec::new(), 0, 5);
     }
 }

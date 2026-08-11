@@ -1,6 +1,7 @@
 // Copyright (c) 2024-2025 Shun Yamamoto and Nobuyuki Yoshioka, and IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
+use crate::gate::Gate;
 use crate::ring::DOmega;
 use dashu_float::{round::mode::HalfEven, FBig};
 use dashu_int::IBig;
@@ -186,17 +187,17 @@ impl DOmegaUnitary {
         )
     }
 
-    pub fn from_gates(gates: &str) -> Self {
+    /// Consumes `gates` right-to-left, i.e. in operator-application order (leftmost gate
+    /// applied last).
+    pub fn from_gates(gates: &[Gate]) -> Self {
         let mut unitary = Self::identity();
-        for g in gates.chars().rev() {
+        for g in gates.iter().rev() {
             unitary = match g {
-                'I' => unitary,
-                'H' => unitary.renew_denomexp(unitary.k() + 1).mul_by_h_from_left(),
-                'T' => unitary.mul_by_t_from_left(),
-                'S' => unitary.mul_by_s_from_left(),
-                'X' => unitary.mul_by_x_from_left(),
-                'W' => unitary.mul_by_w_from_left(),
-                _ => panic!("Unsupported gate: {}", g),
+                Gate::H => unitary.renew_denomexp(unitary.k() + 1).mul_by_h_from_left(),
+                Gate::T => unitary.mul_by_t_from_left(),
+                Gate::S => unitary.mul_by_s_from_left(),
+                Gate::X => unitary.mul_by_x_from_left(),
+                Gate::W => unitary.mul_by_w_from_left(),
             };
         }
         unitary.reduce_denomexp()

@@ -36,6 +36,7 @@ use crate::accuracy::{
 };
 use crate::common::{cos_fbig, fb_with_prec, ib_to_bf_prec, sin_fbig};
 use crate::config::{config_from_theta_epsilon, GridSynthConfig};
+use crate::gate::{Gate, GateSeq};
 use crate::gridsynth::{setup_regions_and_transform, UnitDisk};
 use crate::math::sqrt_fbig;
 use crate::protocol::fallback::{
@@ -60,8 +61,8 @@ use dashu_int::IBig;
 /// success probability on demand.
 #[derive(Debug, Clone)]
 pub struct MixedFallbackSide {
-    /// Gate string for this side's projective step, applied unconditionally.
-    pub projective_gates: String,
+    /// Gate sequence for this side's projective step, applied unconditionally.
+    pub projective_gates: GateSeq,
     /// The mixed-diagonal correction for this side's residual angle, needed with probability
     /// `1 - achieved_success_probability()`.
     pub correction: MixedDiagonalResult,
@@ -86,7 +87,7 @@ impl MixedFallbackSide {
 /// away the mixture's quadratic error cancellation and wildly overstate the achieved error.
 fn weighted_correction_distance(
     theta: &FBig<HalfEven>,
-    projective_gates: &str,
+    projective_gates: &[Gate],
     correction: &MixedDiagonalResult,
 ) -> FBig<HalfEven> {
     residual_diamond_error_mixed(theta, projective_gates, correction)
@@ -127,7 +128,7 @@ pub enum MixedFallbackResult {
     /// `pi/2`): a single gate word suffices, with zero error and no fallback structure at
     /// all -- mirrors [`crate::protocol::mixed_diagonal::MixedDiagonalResult`]'s analogous
     /// degenerate case.
-    Exact { gates: String },
+    Exact { gates: GateSeq },
     /// The general case: two straddling projective branches, mixed with probability `p`
     /// (`lo` at weight `p`, `hi` at weight `1-p`), each with its own achieved success
     /// probability and mixed-diagonal correction.
@@ -365,11 +366,11 @@ mod tests {
     }
 
     fn total_expected_t_count(side: &MixedFallbackSide) -> f64 {
-        let p_t = side.projective_gates.chars().filter(|&c| c == 'T').count() as f64;
+        let p_t = side.projective_gates.t_count() as f64;
         let fail_prob = 1.0 - fbig_to_f64(&side.achieved_success_probability());
         let mut correction_cost = 0.0;
         for branch in &side.correction.branches {
-            let t = branch.gates.chars().filter(|&c| c == 'T').count() as f64;
+            let t = branch.gates.t_count() as f64;
             correction_cost += fbig_to_f64(&branch.weight) * t;
         }
         p_t + fail_prob * correction_cost

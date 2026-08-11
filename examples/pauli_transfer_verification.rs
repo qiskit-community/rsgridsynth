@@ -166,7 +166,7 @@ fn zero_mat4() -> [[Fb; 4]; 4] {
     std::array::from_fn(|_| std::array::from_fn(|_| fzero()))
 }
 
-fn matrix_from_gates(gates: &str) -> M2 {
+fn matrix_from_gates(gates: &[rsgridsynth::gate::Gate]) -> M2 {
     let m = DOmegaUnitary::from_gates(gates).to_complex_matrix();
     [
         [

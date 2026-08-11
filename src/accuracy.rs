@@ -15,6 +15,7 @@
 //! implements a genuinely independent (Pauli-transfer-matrix-based) check, for that purpose.
 
 use crate::common::{cos_fbig, fb_with_prec, ib_to_bf_prec, sin_fbig};
+use crate::gate::Gate;
 use crate::math::sqrt_fbig;
 use crate::ring::DOmega;
 use crate::unitary::DOmegaUnitary;
@@ -112,9 +113,9 @@ pub fn diagonal_diamond_distance(re_w: &FBig<HalfEven>) -> FBig<HalfEven> {
 /// global phase `PhaseMode::Shifted` uses (not ring-representable in `Z[omega]`, so this has
 /// to happen in `FBig` on the decoded complex entry rather than in exact ring arithmetic), and
 /// returns the diamond-norm distance to the ideal target rotation by `theta`.
-pub(crate) fn gate_string_diamond_error(
+pub(crate) fn gate_seq_diamond_error(
     theta: &FBig<HalfEven>,
-    gates: &str,
+    gates: &[Gate],
     extra_eighth_turn: bool,
 ) -> FBig<HalfEven> {
     let wframe = WFrame::new(theta);
@@ -142,8 +143,8 @@ pub(crate) fn gate_string_diamond_error(
 /// straight from its public gate string, without re-deriving `WFrame`/`Re(w)` inline -- and so
 /// that check exercises the actual gate-encode/decode round trip (`decompose_domega_unitary`
 /// followed by `DOmegaUnitary::from_gates`), not just the value computed mid-search.
-pub fn achieved_diagonal_diamond_error(theta: &FBig<HalfEven>, gates: &str) -> FBig<HalfEven> {
-    gate_string_diamond_error(theta, gates, false)
+pub fn achieved_diagonal_diamond_error(theta: &FBig<HalfEven>, gates: &[Gate]) -> FBig<HalfEven> {
+    gate_seq_diamond_error(theta, gates, false)
 }
 
 /// Like [`achieved_diagonal_diamond_error`], but normalizes the decoded top-left entry's
@@ -159,7 +160,7 @@ pub fn achieved_diagonal_diamond_error(theta: &FBig<HalfEven>, gates: &str) -> F
 /// `diagonal_diamond_distance` conflates that magnitude deficit with angular error, giving a
 /// nonsensical, epsilon-independent `~2*sqrt(1-q)` answer instead of the actual (typically much
 /// smaller) angular error.
-pub fn achieved_phase_diamond_error(theta: &FBig<HalfEven>, gates: &str) -> FBig<HalfEven> {
+pub fn achieved_phase_diamond_error(theta: &FBig<HalfEven>, gates: &[Gate]) -> FBig<HalfEven> {
     let u = DOmegaUnitary::from_gates(gates);
     let z = u.z();
     let norm_sq =

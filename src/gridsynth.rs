@@ -613,12 +613,12 @@ pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
         // exact synthesis
         let u_approx = gridsynth_unitary(config, PhaseMode::Exact);
         let gates_exact = decompose_domega_unitary(u_approx);
-        let t_count_exact = gates_exact.chars().filter(|&c| c == 'T').count();
+        let t_count_exact = gates_exact.t_count();
 
         // also shifted synthesis
         let u_approx = gridsynth_unitary(config, PhaseMode::Shifted);
         let gates_shifted = decompose_domega_unitary(u_approx);
-        let t_count_shifted = gates_shifted.chars().filter(|&c| c == 'T').count();
+        let t_count_shifted = gates_shifted.t_count();
 
         if t_count_exact <= t_count_shifted {
             GridSynthResult {
@@ -639,7 +639,7 @@ impl crate::accuracy::AchievedDiamondError for GridSynthResult {
     /// Z-rotation by `theta`, decoded on demand from `self.gates` (accounting for the extra
     /// `e^{i pi/8}` phase `self.global_phase` records having been used, per `PhaseMode`).
     fn achieved_diamond_error(&self, theta: &FBig<HalfEven>) -> FBig<HalfEven> {
-        crate::accuracy::gate_string_diamond_error(theta, &self.gates, self.global_phase)
+        crate::accuracy::gate_seq_diamond_error(theta, &self.gates, self.global_phase)
     }
 }
 

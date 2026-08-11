@@ -3,6 +3,7 @@
 
 use dashu_int::IBig;
 
+use crate::gate::{Gate, GateSeq};
 use crate::normal_form::NormalForm;
 use crate::ring::ZOmega;
 use crate::unitary::DOmegaUnitary;
@@ -10,8 +11,14 @@ use crate::unitary::DOmegaUnitary;
 const BIT_SHIFT: [i32; 16] = [0, 0, 1, 0, 2, 0, 1, 3, 3, 3, 0, 2, 2, 1, 0, 0];
 const BIT_COUNT: [i32; 16] = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
 
-fn reduce_denomexp(mut unitary: DOmegaUnitary) -> (String, DOmegaUnitary) {
-    let t_power_and_h = ["H", "TH", "SH", "TSH"];
+const T_POWER_AND_H: [&[Gate]; 4] = [
+    &[Gate::H],
+    &[Gate::T, Gate::H],
+    &[Gate::S, Gate::H],
+    &[Gate::T, Gate::S, Gate::H],
+];
+
+fn reduce_denomexp(mut unitary: DOmegaUnitary) -> (&'static [Gate], DOmegaUnitary) {
     let residue_z = unitary.z.residue();
     let residue_w = unitary.w.residue();
     let residue_squared_z = (&unitary.z.u * &unitary.z.conj().u).residue();
@@ -24,28 +31,28 @@ fn reduce_denomexp(mut unitary: DOmegaUnitary) -> (String, DOmegaUnitary) {
         unitary = unitary
             .mul_by_h_and_t_power_from_left(0)
             .renew_denomexp(unitary.k() - 1);
-        (t_power_and_h[0].to_string(), unitary)
+        (T_POWER_AND_H[0], unitary)
     } else if residue_squared_z == 0b1010 {
         unitary = unitary
             .mul_by_h_and_t_power_from_left(-m)
             .renew_denomexp(unitary.k() - 1);
-        (t_power_and_h[m as usize].to_string(), unitary)
+        (T_POWER_AND_H[m as usize], unitary)
     } else if residue_squared_z == 0b0001 {
         if BIT_COUNT[residue_z as usize] == BIT_COUNT[residue_w as usize] {
             unitary = unitary
                 .mul_by_h_and_t_power_from_left(-m)
                 .renew_denomexp(unitary.k() - 1);
-            (t_power_and_h[m as usize].to_string(), unitary)
+            (T_POWER_AND_H[m as usize], unitary)
         } else {
             unitary = unitary.mul_by_h_and_t_power_from_left(-m);
-            (t_power_and_h[m as usize].to_string(), unitary)
+            (T_POWER_AND_H[m as usize], unitary)
         }
     } else {
         panic!("Invalid residue");
     }
 }
 
-pub fn decompose_domega_unitary(mut unitary: DOmegaUnitary) -> String {
+pub fn decompose_domega_unitary(mut unitary: DOmegaUnitary) -> GateSeq {
     let omega_power: [ZOmega; 8] = [
         ZOmega::new(IBig::ZERO, IBig::ZERO, IBig::ZERO, IBig::ONE),
         ZOmega::new(IBig::ZERO, IBig::ZERO, IBig::ONE, IBig::ZERO),
@@ -56,19 +63,19 @@ pub fn decompose_domega_unitary(mut unitary: DOmegaUnitary) -> String {
         ZOmega::new(IBig::ZERO, IBig::NEG_ONE, IBig::ZERO, IBig::ZERO),
         ZOmega::new(IBig::NEG_ONE, IBig::ZERO, IBig::ZERO, IBig::ZERO),
     ];
-    let mut gates = String::new();
+    let mut gates = GateSeq::new();
     while unitary.k() > 0 {
         let (g, next_unitary) = reduce_denomexp(unitary);
-        gates += &g;
+        gates.extend(g);
         unitary = next_unitary;
     }
     if unitary.n & 1 != 0 {
-        gates += "T";
+        gates.push(Gate::T);
         unitary = unitary.mul_by_t_inv_from_left();
     }
 
     if unitary.z == IBig::ZERO {
-        gates += "X";
+        gates.push(Gate::X);
         unitary = unitary.mul_by_x_from_left();
     }
 
@@ -82,9 +89,9 @@ pub fn decompose_domega_unitary(mut unitary: DOmegaUnitary) -> String {
     }
 
     let m_s = (unitary.n >> 1) as usize;
-    gates += &"S".repeat(m_s);
+    gates.push_n(Gate::S, m_s);
     unitary = unitary.mul_by_s_power_from_left(-(m_s as i32));
-    gates += &"W".repeat(m_w);
+    gates.push_n(Gate::W, m_w);
     assert_eq!(
         unitary,
         DOmegaUnitary::identity(),

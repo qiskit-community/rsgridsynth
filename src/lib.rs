@@ -5,6 +5,7 @@ pub mod accuracy;
 pub mod common;
 pub mod config;
 pub mod diophantine;
+pub mod gate;
 pub mod grid_op;
 pub mod gridsynth;
 pub mod math;
@@ -19,3 +20,4 @@ pub mod to_upright;
 pub mod unitary;
 
 pub use diophantine::clear_caches;
+pub use gate::{Gate, GateSeq};
