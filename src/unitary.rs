@@ -43,6 +43,21 @@ impl DOmegaUnitary {
         self.w.k
     }
 
+    /// Returns the `z` component of the `[[z, ...], [w, ...]]` D-omega matrix.
+    pub fn z(&self) -> &DOmega {
+        &self.z
+    }
+
+    /// Returns the `w` component of the `[[z, ...], [w, ...]]` D-omega matrix.
+    pub fn w(&self) -> &DOmega {
+        &self.w
+    }
+
+    /// Returns the global-phase power `n` (as a power of `omega = exp(-i pi/4)`).
+    pub fn n(&self) -> u8 {
+        self.n
+    }
+
     pub fn to_matrix(&self) -> &[[DOmega; 2]; 2] {
         self.to_matrix_cache.get_or_init(|| {
             [

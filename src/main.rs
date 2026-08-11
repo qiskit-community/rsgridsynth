@@ -6,6 +6,7 @@ use dashu_int::UBig;
 use log::info;
 use rand::{rngs::StdRng, SeedableRng};
 
+pub mod accuracy;
 pub mod common;
 pub mod config;
 pub mod diophantine;
@@ -22,9 +23,11 @@ pub mod to_upright;
 pub mod unitary;
 use std::{f32::consts::LOG2_10, time::Instant};
 
+use crate::accuracy::AchievedDiamondError;
 use crate::common::{ib_to_bf_prec, set_prec_bits};
 use crate::config::parse_decimal_with_exponent;
 use crate::config::{DiophantineData, GridSynthConfig};
+use dashu_base::Approximation;
 use gridsynth::gridsynth_gates;
 
 fn main() {
@@ -54,7 +57,12 @@ fn main() {
         info!("Elapsed time: {:.3?}", elapsed);
     }
 
-    if let Some(error) = res.error {
+    if matches.get_flag("error") {
+        let error = res.achieved_diamond_error(&args.theta);
+        let error = match error.to_f64() {
+            Approximation::Exact(v) => v,
+            Approximation::Inexact(v, _) => v,
+        };
         println!("error: {:.6e}", error);
     }
     println!("{}", res.gates);
@@ -143,7 +151,6 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
     let verbose = matches.get_flag("verbose");
     let measure_time = matches.get_flag("time");
     let up_to_phase = matches.get_flag("phase");
-    let compute_error = matches.get_flag("error");
 
     let seed = matches.get_one::<String>("seed").unwrap().parse().unwrap();
     let rng: StdRng = SeedableRng::seed_from_u64(seed);
@@ -160,6 +167,5 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         measure_time,
         diophantine_data,
         up_to_phase,
-        compute_error,
     }
 }

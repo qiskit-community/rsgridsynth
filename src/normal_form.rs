@@ -198,6 +198,13 @@ impl NormalForm {
             gates
         }
     }
+
+    /// Number of T-gate applications in the Matsumoto-Amano normal form. Every syllable
+    /// other than `I` (i.e. `T`, `HT`, `SHT`) is a Clifford conjugation of exactly one T,
+    /// so this is simply the count of non-`I` syllables.
+    pub fn t_count(&self) -> usize {
+        self.syllables.iter().filter(|s| **s != Syllable::I).count()
+    }
 }
 
 impl Default for NormalForm {
@@ -333,3 +340,67 @@ const TCONJ_TABLE: [(Axis, u8, u8); 6] = [
     (Axis::SH, 0, 5),
     (Axis::SH, 1, 4),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn manual_t_count(gates: &str) -> usize {
+        gates.chars().filter(|&c| c == 'T').count()
+    }
+
+    // A lone "T" does not trigger any Clifford-conjugation cancellation, so `t_count()`
+    // should agree with a direct character count of the (un-normalized) input.
+    #[test]
+    fn t_count_matches_char_count_for_single_t() {
+        let nf = NormalForm::from_gates("T");
+        assert_eq!(nf.t_count(), manual_t_count("T"));
+    }
+
+    // Repeated adjacent "T"s are NOT expected to preserve a raw T-count: e.g. T*T = S (a
+    // Clifford, per T^2 = S), so `NormalForm::from_gates("TT")` legitimately normalizes to
+    // zero T syllables. This is correct behavior of Matsumoto-Amano normal form, not a bug
+    // in `t_count()` -- so here we instead verify `t_count()` is self-consistent with the
+    // *normalized* output, i.e. equals a direct count of 'T' characters in
+    // `nf.to_gates()`. `to_gates()` emits exactly one 'T' per non-`I` syllable (as "T",
+    // "HT", or "SHT") and the trailing Clifford suffix never contains a 'T', so this must
+    // hold for any normal form, and doubles as a lightweight check that `t_count()` and
+    // `to_gates()` haven't drifted out of sync with each other.
+    #[test]
+    fn t_count_matches_normalized_char_count_for_repeated_t_strings() {
+        for gates in ["", "T", "TT", "TTT", "TTTTTTTTTT"] {
+            let nf = NormalForm::from_gates(gates);
+            let normalized = nf.to_gates();
+            assert_eq!(
+                nf.t_count(),
+                manual_t_count(&normalized),
+                "mismatch for input {gates:?}, normalized to {normalized:?}"
+            );
+        }
+    }
+
+    // Golden gate strings from tests/integration_test.rs. These are already the
+    // (gate-only, i.e. no measurement/other non Clifford+T symbols) output of
+    // `decompose_domega_unitary`, which itself already produces Matsumoto-Amano normal
+    // form output. Re-normalizing normal-form output should be idempotent, so we expect
+    // `t_count()` on these strings to equal a direct count of 'T' characters in them.
+    const GOLDEN_GATES: &[&str] = &[
+        "HTHTSHTSHTHTSHTHTSHTHTHTSHTSHTHTHTHTHTHTSHTSHTHTSHTSHTSHTSHTHTSHTSHTSHTHTHTHTHTHTSHTSHTHTSHTSHTSHTHTHTSHTSHTSHTSHTSHTSHTSHTHTHTHTHTSHTSHTSHTSHTSHTSHTHTHTHTHTSHTHTSHTHTHTSHTSHTSHTHTSHTSHTHTSHTHTSHTSHTHTSHTHTHTSHTSHTSHTSHTHTHTHTSHTHTHTSHTHTSHTHTHTSHTHTSHTHTSHTXSSWWW",
+        "HTSHTSHTSHTHTHTSHTHTHTSHTSHTHTHTHTHTHTSHTHTHTHTSHTSHTHTSHTHTHTHTHTHTHTHTSHTHTHTHTSHTHTSHTSHTSHTSHTHTSHTSHTHTSHTSHTHTSHTHTHTSHTSHTHTHTHTSHTHTSHTHTSHTHTHTSHTSHTHTHTHTHTSHTHTSHTSHTHTHTHTSHTHTHTSHTHTHTHTSHTHTSHTSHTHTSHTHTSHTHTHTHTHTHTHTHTSHTHTHTSHTSSSWW",
+        "HTSHTHTHTSHTHTHTHTHTHTHTHTSHTHTSHTHTSHTSHTHTSHTHTHTHTSHTHTHTSHTHTHTHTSHTSHTHTSHTHTHTHTHTSHTSHTHTHTSHTHTSHTHTSHTHTHTHTSHTSHTHTHTSHTHTSHTSHTHTSHTSHTHTSHTSHTSHTSHTHTSHTHTHTHTSHTHTHTHTHTHTHTHTSHTHTSHTSHTHTHTHTSHTHTHTHTHTHTSHTSHTHTHTSHTHTHTSHTSHTSHTSSSWW",
+        "SHTSHTHTSHTSHTHTSHTHTHTSHTSHTSHTHTSHTSHTHTHTSHTSHTSHTHTHTSHTHTSHTSHTSHTSHTSHTSHTSHTHTHTHTSHTHTHTHTHTHTSHTSHTHTHTSHTSHTHTHTHTSHTSHTHTSHTSHTSHTHTSHTHTHTSHTSHTHTSHTSHTSHTHTSHTHTHTSHTHTHTSHTSHTSHTSHTHTHTHTHTSHTSHTSHTHTSHTSHTHTSHTHTSHTHTHTHTSHTSHTHTSHTSHTSHTHTSHTSHTSHTHTSHTHTHTSHTHTHTSHTSHTHTSHTSHTHTSHTSHTSHTHTHTSHTSHTSHTSHTHTHTHTSHTHTHTHTHTSHTSHTHTSHSWW",
+        "TWWWWWWW",
+    ];
+
+    #[test]
+    fn t_count_matches_char_count_for_golden_gate_strings() {
+        for gates in GOLDEN_GATES {
+            let nf = NormalForm::from_gates(gates);
+            assert_eq!(
+                nf.t_count(),
+                manual_t_count(gates),
+                "t_count mismatch for golden string {gates:?}"
+            );
+        }
+    }
+}

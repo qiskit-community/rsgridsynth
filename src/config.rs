@@ -21,32 +21,17 @@ pub struct GridSynthConfig {
     pub measure_time: bool,
     pub diophantine_data: DiophantineData,
     pub up_to_phase: bool,
-    pub compute_error: bool,
 }
 
-impl GridSynthConfig {
-    /// Turns on or off checking solutions at the end of the run
-    pub fn with_compute_error(self, compute_error: bool) -> Self {
-        Self {
-            compute_error,
-            ..self
-        }
-    }
-}
-
-/// The result of running the gridsynth algorithm
+/// The result of running the gridsynth algorithm. Accuracy against a target angle is not
+/// computed here -- call [`crate::accuracy::AchievedDiamondError::achieved_diamond_error`] on
+/// demand instead.
 pub struct GridSynthResult {
     /// List of gates.
     pub gates: String,
 
     /// The global phase factor.
     pub global_phase: bool,
-
-    /// If error is computed, stores the error.
-    pub error: Option<f64>,
-
-    /// If error is computed, stores whether approximation is correct.
-    pub is_correct: Option<bool>,
 }
 
 pub fn parse_decimal_with_exponent(input: &str) -> Option<(IBig, IBig)> {
@@ -140,6 +125,5 @@ pub fn config_from_theta_epsilon(
         measure_time: time,
         diophantine_data,
         up_to_phase,
-        compute_error: false,
     }
 }

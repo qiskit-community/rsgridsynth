@@ -4,16 +4,16 @@
 use crate::common::{cos_fbig, fb_with_prec, get_prec_bits, ib_to_bf_prec, sin_fbig};
 use crate::config::{GridSynthConfig, GridSynthResult};
 use crate::diophantine::diophantine_dyadic;
+use crate::grid_op::GridOp;
 use crate::math::solve_quadratic;
 use crate::math::sqrt_fbig;
-use crate::region::Ellipse;
+use crate::region::{Ellipse, Rectangle};
 use crate::ring::{DOmega, DRootTwo, ZOmega, ZRootTwo};
 use crate::synthesis_of_clifford_t::decompose_domega_unitary;
 use crate::tdgp::solve_tdgp;
 use crate::tdgp::Region;
 use crate::to_upright::to_upright_set_pair;
 use crate::unitary::DOmegaUnitary;
-use dashu_base::{Approximation, SquareRoot};
 use dashu_float::round::mode::HalfEven;
 use dashu_float::FBig;
 use dashu_int::IBig;
@@ -22,7 +22,6 @@ use dashu_int::IBig;
 use log::debug;
 
 use nalgebra::{Matrix2, Vector2};
-use num::Complex;
 use std::cmp::Ordering;
 use std::time::{Duration, Instant};
 
@@ -73,78 +72,6 @@ pub enum PhaseMode {
     Shifted, // do scaling
 }
 
-fn rotation_mat(theta: &FBig<HalfEven>) -> Matrix2<Complex<FBig<HalfEven>>> {
-    let two = fb_with_prec(FBig::try_from(2.0).unwrap());
-    let theta_half = fb_with_prec(theta / &two);
-    let neg_theta_half = -fb_with_prec(theta_half);
-    let z_x: FBig<HalfEven> = fb_with_prec(cos_fbig(&neg_theta_half));
-    let z_y: FBig<HalfEven> = fb_with_prec(sin_fbig(&neg_theta_half));
-    let neg_z_y: FBig<HalfEven> = -fb_with_prec(z_y.clone());
-    let zero: FBig<HalfEven> = ib_to_bf_prec(IBig::ZERO);
-
-    Matrix2::new(
-        Complex::new(z_x.clone(), z_y.clone()),
-        Complex::new(zero.clone(), zero.clone()),
-        Complex::new(zero.clone(), zero.clone()),
-        Complex::new(z_x.clone(), neg_z_y.clone()),
-    )
-}
-
-fn mult_complex_nums(
-    u: &Complex<FBig<HalfEven>>,
-    v: &Complex<FBig<HalfEven>>,
-) -> Complex<FBig<HalfEven>> {
-    let re = &u.re * &v.re - &u.im * &v.im;
-    let im = &u.re * &v.im + &u.im * &v.re;
-    Complex::new(re, im)
-}
-
-fn to_fbig(x: f64) -> FBig<HalfEven> {
-    FBig::<HalfEven>::try_from(x)
-        .unwrap()
-        .with_precision(get_prec_bits())
-        .value()
-}
-
-/// Checks correctness of the synthesized circuit.
-fn compute_error(
-    gates: &str,
-    theta: &FBig<HalfEven>,
-    epsilon: &FBig<HalfEven>,
-    phase: PhaseMode,
-) -> (f64, bool) {
-    let expected = rotation_mat(theta);
-    let synthesized = DOmegaUnitary::from_gates(gates).to_complex_matrix();
-
-    // x = e^{-i theta / 2}
-    let x = expected[(0, 0)].clone();
-    let u = match phase {
-        PhaseMode::Exact => synthesized[(0, 0)].clone(),
-        PhaseMode::Shifted => {
-            let p = to_fbig(std::f64::consts::PI / 8.);
-            let phase = Complex::new(cos_fbig(&p), sin_fbig(&p));
-            mult_complex_nums(&synthesized[(0, 0)].clone(), &phase)
-        }
-    };
-
-    // This computes the eigenvalues of A^* A, where A = expected - synthesized.
-    // The operator norm is the square root of this.
-    let eig: FBig<HalfEven> = 2 - 2 * (&x.re * &u.re + &x.im * &u.im);
-
-    // Due to small numerical imprecisions when computing cos(\theta / 2), it may happen that we
-    // get a slightly negative value.
-    let eig = eig.max(FBig::from(0));
-
-    // Compute the norm.
-    let norm = fb_with_prec(eig.sqrt());
-    // High precision is needed only for the synthesis algorithm
-    let fnorm = match norm.to_f64() {
-        Approximation::Inexact(v, _) => v,
-        Approximation::Exact(v) => v,
-    };
-    (fnorm, norm < *epsilon)
-}
-
 #[derive(Debug)]
 pub struct EpsilonRegion {
     _theta: FBig<HalfEven>,
@@ -158,19 +85,58 @@ pub struct EpsilonRegion {
 
 impl EpsilonRegion {
     pub fn new(theta: FBig<HalfEven>, epsilon: FBig<HalfEven>, scale: ZRootTwo) -> Self {
-        let one = fb_with_prec(FBig::try_from(1.0).unwrap());
         let two = fb_with_prec(FBig::try_from(2.0).unwrap());
-        let four = fb_with_prec(FBig::try_from(4.0).unwrap());
-        let epsilon_squared = fb_with_prec(&epsilon * &epsilon);
-        let half_eps_sq = fb_with_prec(&epsilon_squared / &four);
-        let one_minus_half_eps_sq = one - half_eps_sq;
-        let scale_to_real = scale.to_real();
-        let d = fb_with_prec(sqrt_fbig(&one_minus_half_eps_sq) * sqrt_fbig(&scale_to_real));
-
         let theta_half = fb_with_prec(&theta / &two);
         let neg_theta_half = -fb_with_prec(theta_half);
         let z_x: FBig<HalfEven> = fb_with_prec(cos_fbig(&neg_theta_half));
         let z_y: FBig<HalfEven> = fb_with_prec(sin_fbig(&neg_theta_half));
+        Self::from_target_direction_impl(z_x, z_y, epsilon, scale, theta)
+    }
+
+    /// Builds the same region as [`EpsilonRegion::new`], but from the target direction's
+    /// half-angle cosine/sine directly (`z_x = cos(-phi/2)`, `z_y = sin(-phi/2)` for whatever
+    /// angle `phi` the caller wants as the target), instead of from a raw angle `theta`.
+    ///
+    /// This exists so a caller that already has `phi` expressed as an exact `(cos(phi/2),
+    /// sin(phi/2))` pair -- e.g. derived algebraically via angle-addition/half-angle identities
+    /// from another region's synthesized unitary, as the fallback protocol's residual-angle
+    /// correction step needs -- can build the region without a lossy angle round-trip through
+    /// an `atan2`-style inverse-trig call (which this crate does not otherwise implement) and a
+    /// second `cos_fbig`/`sin_fbig` evaluation. `(z_x, z_y)` must satisfy `z_x^2 + z_y^2 == 1`
+    /// (a unit vector); this is not checked.
+    pub fn from_target_direction(
+        z_x: FBig<HalfEven>,
+        z_y: FBig<HalfEven>,
+        epsilon: FBig<HalfEven>,
+        scale: ZRootTwo,
+    ) -> Self {
+        // No real `theta` is available here; the `_theta`/`_epsilon` fields are stored only for
+        // `Debug` output and are never read by any `Region` method, so a placeholder is fine.
+        let placeholder_theta: FBig<HalfEven> = ib_to_bf_prec(IBig::ZERO);
+        Self::from_target_direction_impl(z_x, z_y, epsilon, scale, placeholder_theta)
+    }
+
+    fn from_target_direction_impl(
+        z_x: FBig<HalfEven>,
+        z_y: FBig<HalfEven>,
+        epsilon: FBig<HalfEven>,
+        scale: ZRootTwo,
+        theta_for_debug: FBig<HalfEven>,
+    ) -> Self {
+        let one = fb_with_prec(FBig::try_from(1.0).unwrap());
+        let four = fb_with_prec(FBig::try_from(4.0).unwrap());
+        let epsilon_squared = fb_with_prec(&epsilon * &epsilon);
+        let half_eps_sq = fb_with_prec(&epsilon_squared / &four);
+        // `epsilon` >= 2 (or a derived epsilon that overshoots it, e.g. the fallback
+        // protocol's rescaled correction-step epsilon on a near-degenerate candidate) is
+        // already past the point where any point of the disk fails to qualify: the sane
+        // mathematical limit of the formula below is `d = 0` (no angular restriction at
+        // all), not a negative radicand. Clamp rather than let a tiny-precision rounding
+        // artifact (or a legitimately oversized derived epsilon) panic in `sqrt_fbig`.
+        let one_minus_half_eps_sq = (one - half_eps_sq).max(ib_to_bf_prec(IBig::ZERO));
+        let scale_to_real = scale.to_real();
+        let d = fb_with_prec(sqrt_fbig(&one_minus_half_eps_sq) * sqrt_fbig(&scale_to_real));
+
         let neg_z_y: FBig<HalfEven> = -fb_with_prec(z_y.clone());
         let zero: FBig<HalfEven> = ib_to_bf_prec(IBig::ZERO);
         let epsilon_neg4: FBig<HalfEven> = fb_with_prec(epsilon.clone().powi(IBig::from(-4)));
@@ -192,7 +158,7 @@ impl EpsilonRegion {
         let m: Matrix2<FBig<HalfEven>> = matrix_multiply_2x2(&m1, &d3);
         let ellipse = Ellipse::new(m, p);
         Self {
-            _theta: theta,
+            _theta: theta_for_debug,
             _epsilon: epsilon,
             scale,
             d,
@@ -291,7 +257,41 @@ impl Region for UnitDisk {
     }
 }
 
-fn process_solution_candidate(mut z: DOmega, mut w: DOmega, phase: PhaseMode) -> DOmegaUnitary {
+/// Lightweight counters over the (lazy) candidate stream examined during the
+/// Diophantine search inside [`search_for_solution`]. Intentionally does not require
+/// materializing the candidate iterator (e.g. via `.len()`/`.count()`) -- each field is
+/// incremented one candidate at a time, inside the loop that is already consuming the
+/// iterator lazily.
+///
+/// Not yet wired into any public entry point; this exists so a future stage can surface
+/// search diagnostics (e.g. for tuning mixed/fallback region predicates) without having
+/// to re-plumb the search loop.
+#[derive(Debug, Default)]
+pub struct CandidateStats {
+    /// Number of candidates pulled from the `solve_tdgp` iterator.
+    pub examined: usize,
+    /// Number of times `diophantine_dyadic` was invoked on a candidate.
+    pub diophantine_attempts: usize,
+    /// Number of candidates for which `diophantine_dyadic` found a solution.
+    pub solved: usize,
+}
+
+/// The output of [`to_upright_set_pair`](crate::to_upright::to_upright_set_pair): the grid
+/// operator that maps the original region pair to an "upright" pair, the transformed
+/// ellipses, and their axis-aligned bounding boxes.
+pub struct UprightTransform {
+    pub op_g: GridOp,
+    pub ellipse_a: Ellipse,
+    pub ellipse_b: Ellipse,
+    pub bbox_a: Rectangle,
+    pub bbox_b: Rectangle,
+}
+
+pub(crate) fn process_solution_candidate(
+    mut z: DOmega,
+    mut w: DOmega,
+    phase: PhaseMode,
+) -> DOmegaUnitary {
     z = z.reduce_denomexp();
     w = w.reduce_denomexp();
 
@@ -329,11 +329,12 @@ fn process_solution_candidate(mut z: DOmega, mut w: DOmega, phase: PhaseMode) ->
     }
 }
 
-fn process_solutions<I>(
+pub(crate) fn process_solutions<I>(
     config: &mut GridSynthConfig,
     solutions: I,
     time_of_diophantine_dyadic: &mut Duration,
     phase: PhaseMode,
+    mut stats: Option<&mut CandidateStats>,
 ) -> Option<DOmegaUnitary>
 where
     I: Iterator<Item = DOmega>,
@@ -345,6 +346,10 @@ where
     };
 
     for z in solutions {
+        if let Some(s) = stats.as_deref_mut() {
+            s.examined += 1;
+        }
+
         if (&z * z.conj()).residue() == 0 {
             continue;
         }
@@ -362,6 +367,9 @@ where
 
         let xi = DRootTwo::from_int(IBig::ONE)
             - DRootTwo::from_domega(z_with_phase.conj() * &z_with_phase);
+        if let Some(s) = stats.as_deref_mut() {
+            s.diophantine_attempts += 1;
+        }
         if let Some(w_val) = diophantine_dyadic(xi, &mut config.diophantine_data) {
             if let Some(start) = start_diophantine {
                 *time_of_diophantine_dyadic += start.elapsed();
@@ -375,6 +383,9 @@ where
             if config.verbose {
                 debug!("------------------");
             }
+            if let Some(s) = stats.as_deref_mut() {
+                s.solved += 1;
+            }
             return Some(process_solution_candidate(z_with_phase, w_val, phase));
         }
     }
@@ -385,23 +396,15 @@ where
     None
 }
 
-fn setup_regions_and_transform(
+/// Constructs the concrete `EpsilonRegion`/`UnitDisk` pair for the (theta, epsilon, phase)
+/// triple. This is the only place that needs to know the concrete region types used by
+/// `gridsynth`; `setup_regions_and_transform` and `search_for_solution` below are generic
+/// over the first region so a future sibling `Region` implementation can reuse them.
+pub(crate) fn epsilon_region_and_unit_disk(
     theta: FBig<HalfEven>,
     epsilon: FBig<HalfEven>,
-    verbose: bool,
-    measure_time: bool,
     phase: PhaseMode,
-) -> (
-    EpsilonRegion,
-    UnitDisk,
-    (
-        crate::grid_op::GridOp,
-        crate::region::Ellipse,
-        crate::region::Ellipse,
-        crate::region::Rectangle,
-        crate::region::Rectangle,
-    ),
-) {
+) -> (EpsilonRegion, UnitDisk) {
     let epsilon_region_scale = match phase {
         PhaseMode::Exact => ZRootTwo {
             a: IBig::from(1),
@@ -426,13 +429,21 @@ fn setup_regions_and_transform(
 
     let epsilon_region = EpsilonRegion::new(theta, epsilon, epsilon_region_scale);
     let unit_disk = UnitDisk::new(unit_disk_scale);
+    (epsilon_region, unit_disk)
+}
 
+pub(crate) fn setup_regions_and_transform<A: Region + std::fmt::Debug>(
+    set_a: &A,
+    set_b: &UnitDisk,
+    verbose: bool,
+    measure_time: bool,
+) -> UprightTransform {
     let start_upright = if measure_time {
         Some(Instant::now())
     } else {
         None
     };
-    let transformed = to_upright_set_pair(&epsilon_region, &unit_disk, verbose);
+    let (op_g, ellipse_a, ellipse_b, bbox_a, bbox_b) = to_upright_set_pair(set_a, set_b, verbose);
     if let Some(start) = start_upright {
         if measure_time {
             debug!(
@@ -446,27 +457,37 @@ fn setup_regions_and_transform(
         debug!("------------------");
     }
 
-    (epsilon_region, unit_disk, transformed)
+    UprightTransform {
+        op_g,
+        ellipse_a,
+        ellipse_b,
+        bbox_a,
+        bbox_b,
+    }
 }
 
-fn search_for_solution(
-    epsilon_region: &EpsilonRegion,
+pub(crate) fn search_for_solution<A: Region + std::fmt::Debug>(
+    epsilon_region: &A,
     unit_disk: &UnitDisk,
-    transformed: &(
-        crate::grid_op::GridOp,
-        crate::region::Ellipse,
-        crate::region::Ellipse,
-        crate::region::Rectangle,
-        crate::region::Rectangle,
-    ),
+    transformed: &UprightTransform,
     config: &mut GridSynthConfig,
     phase: PhaseMode,
-) -> DOmegaUnitary {
+    mut stats: Option<&mut CandidateStats>,
+) -> Option<DOmegaUnitary> {
+    // A generous upper bound on the number of grid-refinement steps `k` the search will
+    // try before giving up. Working precision is already set as a multiple of
+    // log2(1/epsilon), and legitimate solutions are found at `k` roughly proportional to
+    // log2(1/epsilon) too, so this bound is effectively unreachable for any well-formed
+    // (theta, epsilon, region) input -- it exists only to fail loudly, in finite time,
+    // if a `Region` predicate is ever incorrect (in which case no solution may exist and
+    // the loop below would otherwise spin forever).
+    let max_k = 4 * get_prec_bits() as i64;
+
     let mut k = 0;
     let mut time_of_solve_tdgp = Duration::ZERO;
     let mut time_of_diophantine_dyadic = Duration::ZERO;
 
-    loop {
+    while k <= max_k {
         let start_tdgp = if config.measure_time {
             Some(Instant::now())
         } else {
@@ -475,9 +496,9 @@ fn search_for_solution(
         let solutions = solve_tdgp(
             epsilon_region,
             unit_disk,
-            &transformed.0,
-            &transformed.3,
-            &transformed.4,
+            &transformed.op_g,
+            &transformed.bbox_a,
+            &transformed.bbox_b,
             k,
             config.verbose,
         );
@@ -494,20 +515,25 @@ fn search_for_solution(
             time_of_solve_tdgp += start.elapsed();
         }
         if let Some(solutions) = solutions {
-            if let Some(result) =
-                process_solutions(config, solutions, &mut time_of_diophantine_dyadic, phase)
-            {
+            if let Some(result) = process_solutions(
+                config,
+                solutions,
+                &mut time_of_diophantine_dyadic,
+                phase,
+                stats.as_deref_mut(),
+            ) {
                 if config.measure_time {
                     debug!(
                         "time of solve_TDGP: {:.3} ms",
                         time_of_solve_tdgp.as_secs_f64() * 1000.0
                     );
                 }
-                return result;
+                return Some(result);
             }
         }
         k += 1;
     }
+    None
 }
 
 /// Core gridsynth algorithm that finds an optimal Clifford+T approximation.
@@ -521,17 +547,44 @@ fn search_for_solution(
 /// * `measure_time` - Enable timing measurements
 ///
 /// # Returns
-/// A DOmegaUnitary representing the optimal Clifford+T approximation
-fn gridsynth(config: &mut GridSynthConfig, phase: PhaseMode) -> DOmegaUnitary {
-    let (epsilon_region, unit_disk, transformed) = setup_regions_and_transform(
-        config.theta.clone(),
-        config.epsilon.clone(),
+/// `Some(DOmegaUnitary)` representing the optimal Clifford+T approximation, or `None` if
+/// the search exceeded its (very generous) internal bound on `k` without finding a
+/// solution -- see [`search_for_solution`] for why that can only happen if a `Region`
+/// predicate is broken.
+pub(crate) fn gridsynth(config: &mut GridSynthConfig, phase: PhaseMode) -> Option<DOmegaUnitary> {
+    let (epsilon_region, unit_disk) =
+        epsilon_region_and_unit_disk(config.theta.clone(), config.epsilon.clone(), phase);
+    let transformed = setup_regions_and_transform(
+        &epsilon_region,
+        &unit_disk,
         config.verbose,
         config.measure_time,
-        phase,
     );
 
-    search_for_solution(&epsilon_region, &unit_disk, &transformed, config, phase)
+    search_for_solution(
+        &epsilon_region,
+        &unit_disk,
+        &transformed,
+        config,
+        phase,
+        None,
+    )
+}
+
+/// Public wrapper around the core gridsynth search that returns the synthesized
+/// `DOmegaUnitary` directly, rather than a decomposed Clifford+T gate string. Intended for
+/// callers that need the raw unitary (e.g. future mixed-diagonal/fallback synthesis
+/// protocols composing multiple `gridsynth` calls).
+///
+/// # Panics
+/// Panics if the internal search exceeds its generous bound on `k` without finding a
+/// solution. This is not expected to trigger for any well-formed `(theta, epsilon)` input;
+/// see [`search_for_solution`] for details. A panic here is preferable to the unbounded
+/// hang this replaces.
+pub fn gridsynth_unitary(config: &mut GridSynthConfig, phase: PhaseMode) -> DOmegaUnitary {
+    gridsynth(config, phase).expect(
+        "gridsynth: exceeded max_k without finding a solution — region predicate is likely incorrect",
+    )
 }
 
 pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
@@ -549,76 +602,99 @@ pub fn gridsynth_gates(config: &mut GridSynthConfig) -> GridSynthResult {
 
     if !config.up_to_phase {
         // exact synthesis only
-        let u_approx = gridsynth(config, PhaseMode::Exact);
+        let u_approx = gridsynth_unitary(config, PhaseMode::Exact);
         let gates = decompose_domega_unitary(u_approx);
-
-        // Perform validation check, if required.
-        let (error, is_correct) = match config.compute_error {
-            true => {
-                let (e, is_ok) =
-                    compute_error(&gates, &config.theta, &config.epsilon, PhaseMode::Exact);
-                (Some(e), Some(is_ok))
-            }
-            false => (None, None),
-        };
 
         GridSynthResult {
             gates,
             global_phase: false,
-            error,
-            is_correct,
         }
     } else {
         // exact synthesis
-        let u_approx = gridsynth(config, PhaseMode::Exact);
+        let u_approx = gridsynth_unitary(config, PhaseMode::Exact);
         let gates_exact = decompose_domega_unitary(u_approx);
         let t_count_exact = gates_exact.chars().filter(|&c| c == 'T').count();
 
         // also shifted synthesis
-        let u_approx = gridsynth(config, PhaseMode::Shifted);
+        let u_approx = gridsynth_unitary(config, PhaseMode::Shifted);
         let gates_shifted = decompose_domega_unitary(u_approx);
         let t_count_shifted = gates_shifted.chars().filter(|&c| c == 'T').count();
 
         if t_count_exact <= t_count_shifted {
-            let (error, is_correct) = match config.compute_error {
-                true => {
-                    let (e, is_ok) = compute_error(
-                        &gates_exact,
-                        &config.theta,
-                        &config.epsilon,
-                        PhaseMode::Exact,
-                    );
-                    (Some(e), Some(is_ok))
-                }
-                false => (None, None),
-            };
-
             GridSynthResult {
                 gates: gates_exact,
                 global_phase: false,
-                error,
-                is_correct,
             }
         } else {
-            let (error, is_correct) = match config.compute_error {
-                true => {
-                    let (e, is_ok) = compute_error(
-                        &gates_shifted,
-                        &config.theta,
-                        &config.epsilon,
-                        PhaseMode::Shifted,
-                    );
-                    (Some(e), Some(is_ok))
-                }
-                false => (None, None),
-            };
-
             GridSynthResult {
                 gates: gates_shifted,
                 global_phase: true,
-                error,
-                is_correct,
             }
         }
+    }
+}
+
+impl crate::accuracy::AchievedDiamondError for GridSynthResult {
+    /// Diamond-norm distance between this result's synthesized channel and the ideal
+    /// Z-rotation by `theta`, decoded on demand from `self.gates` (accounting for the extra
+    /// `e^{i pi/8}` phase `self.global_phase` records having been used, per `PhaseMode`).
+    fn achieved_diamond_error(&self, theta: &FBig<HalfEven>) -> FBig<HalfEven> {
+        crate::accuracy::gate_string_diamond_error(theta, &self.gates, self.global_phase)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::config_from_theta_epsilon;
+    use serial_test::serial;
+
+    /// Exercises the `Option<&mut CandidateStats>` path threaded through
+    /// `search_for_solution`/`process_solutions` (not yet reachable from any public API).
+    /// Confirms the counters are populated sensibly for a real search, without ever
+    /// materializing the underlying lazy candidate iterator.
+    #[test]
+    #[serial]
+    fn candidate_stats_are_populated_when_provided() {
+        crate::clear_caches();
+        let theta = std::f64::consts::PI / 8.0;
+        let epsilon = 1e-10;
+        let mut config = config_from_theta_epsilon(theta, epsilon, 1234, false, false);
+
+        let (epsilon_region, unit_disk) = epsilon_region_and_unit_disk(
+            config.theta.clone(),
+            config.epsilon.clone(),
+            PhaseMode::Exact,
+        );
+        let transformed = setup_regions_and_transform(
+            &epsilon_region,
+            &unit_disk,
+            config.verbose,
+            config.measure_time,
+        );
+
+        let mut stats = CandidateStats::default();
+        let result = search_for_solution(
+            &epsilon_region,
+            &unit_disk,
+            &transformed,
+            &mut config,
+            PhaseMode::Exact,
+            Some(&mut stats),
+        );
+
+        assert!(result.is_some(), "expected a solution to be found");
+        assert!(
+            stats.examined > 0,
+            "expected at least one candidate to be examined"
+        );
+        assert!(
+            stats.diophantine_attempts > 0,
+            "expected at least one diophantine attempt"
+        );
+        assert_eq!(
+            stats.solved, 1,
+            "expected exactly one solved candidate on success"
+        );
     }
 }

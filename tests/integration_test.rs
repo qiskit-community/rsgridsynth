@@ -1,7 +1,17 @@
+use dashu_float::round::mode::HalfEven;
+use dashu_float::FBig;
+use rsgridsynth::accuracy::AchievedDiamondError;
 use rsgridsynth::clear_caches;
 use rsgridsynth::config::config_from_theta_epsilon;
 use rsgridsynth::gridsynth::gridsynth_gates;
 use serial_test::serial;
+
+fn fbig_to_f64(x: &FBig<HalfEven>) -> f64 {
+    match x.to_f64() {
+        dashu_base::Approximation::Exact(v) => v,
+        dashu_base::Approximation::Inexact(v, _) => v,
+    }
+}
 
 #[test]
 #[serial]
@@ -61,6 +71,7 @@ fn pi_over_4_exact_test() {
     let seed = 1234;
     let up_to_phase = false;
     let verbose = false;
+    clear_caches();
     let mut gridsynth_config =
         config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
     let gates = gridsynth_gates(&mut gridsynth_config).gates;
@@ -78,6 +89,7 @@ fn pi_over_4_with_phase_test() {
     let seed = 1234;
     let up_to_phase = true;
     let verbose = false;
+    clear_caches();
     let mut gridsynth_config =
         config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
     let gates = gridsynth_gates(&mut gridsynth_config).gates;
@@ -99,24 +111,22 @@ fn test_correct_decomposition_exact() {
     for theta in thetas {
         clear_caches();
         let mut gridsynth_config =
-            config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase)
-                .with_compute_error(true);
+            config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
 
         let res = gridsynth_gates(&mut gridsynth_config);
+        let error = res.achieved_diamond_error(&gridsynth_config.theta);
+        let is_correct = fbig_to_f64(&error) < fbig_to_f64(&gridsynth_config.epsilon) * 2.0;
 
         // not printed, unless cargo test is run with -- -no-capture
-        match res.error {
-            Some(error) => {
-                println!(
-                    "theta = {theta}, gates = {}, error = {:.6e}, correct = {:?}",
-                    res.gates, error, res.is_correct,
-                )
-            }
-            None => panic!("Expected computed error"),
-        }
+        println!(
+            "theta = {theta}, gates = {}, error = {:.6e}, correct = {is_correct:?}",
+            res.gates,
+            fbig_to_f64(&error),
+        );
 
-        // Check that the check result exits and is valid.
-        assert!(res.is_correct.is_some_and(|v| v));
+        // Check that the diamond-norm error is within the requested (doubled, per the
+        // diamond-vs-operator-norm convention) budget.
+        assert!(is_correct);
     }
 }
 
@@ -134,23 +144,21 @@ fn test_correct_decomposition_up_to_phase() {
     for theta in thetas {
         clear_caches();
         let mut gridsynth_config =
-            config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase)
-                .with_compute_error(true);
+            config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
 
         let res = gridsynth_gates(&mut gridsynth_config);
+        let error = res.achieved_diamond_error(&gridsynth_config.theta);
+        let is_correct = fbig_to_f64(&error) < fbig_to_f64(&gridsynth_config.epsilon) * 2.0;
 
         // not printed, unless cargo test is run with -- -no-capture
-        match res.error {
-            Some(error) => {
-                println!(
-                    "theta = {theta}, gates = {}, error = {:.6e}, correct = {:?}",
-                    res.gates, error, res.is_correct,
-                )
-            }
-            None => panic!("Expected computed error"),
-        }
-        // Check that the check result exits and is valid.
-        assert!(res.is_correct.is_some_and(|v| v));
+        println!(
+            "theta = {theta}, gates = {}, error = {:.6e}, correct = {is_correct:?}",
+            res.gates,
+            fbig_to_f64(&error),
+        );
+        // Check that the diamond-norm error is within the requested (doubled, per the
+        // diamond-vs-operator-norm convention) budget.
+        assert!(is_correct);
     }
 }
 
@@ -181,17 +189,17 @@ fn test_shared_cache_across_denomexp_no_panic() {
         let theta = i as f64 * 0.01;
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let mut gridsynth_config =
-                config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase)
-                    .with_compute_error(true);
-            gridsynth_gates(&mut gridsynth_config)
+                config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
+            let res = gridsynth_gates(&mut gridsynth_config);
+            let error = fbig_to_f64(&res.achieved_diamond_error(&gridsynth_config.theta));
+            let is_correct = error < fbig_to_f64(&gridsynth_config.epsilon) * 2.0;
+            (error, is_correct)
         }));
 
         match result {
-            Ok(res) => {
-                if let Some(error) = res.error {
-                    max_error = max_error.max(error);
-                }
-                if !res.is_correct.is_some_and(|v| v) {
+            Ok((error, is_correct)) => {
+                max_error = max_error.max(error);
+                if !is_correct {
                     incorrect_thetas.push(theta);
                 }
             }
