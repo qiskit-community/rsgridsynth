@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2025 Shun Yamamoto and Nobuyuki Yoshioka, and IBM
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 
-use crate::common::{ib_to_bf_prec, PI};
+use crate::common::{ib_to_bf_prec, pi};
 use dashu_float::round::mode::{self, HalfEven};
 use dashu_float::{Context, FBig};
 use dashu_int::IBig;
@@ -404,7 +404,7 @@ impl Ellipse {
     }
 
     pub fn area(&self) -> FBig<HalfEven> {
-        (*PI).clone() / self.sqrt_det()
+        pi() / self.sqrt_det()
     }
 
     pub fn normalize(&self) -> Self {
