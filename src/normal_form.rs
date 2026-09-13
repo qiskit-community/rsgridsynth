@@ -153,7 +153,7 @@ impl NormalForm {
                                 }
                                 Syllable::SHT => {
                                     self.syllables.pop();
-                                    self.c = (CLIFFORD_H * CLIFFORD_S * CLIFFORD_H) * new_c;
+                                    self.c = (CLIFFORD_S * CLIFFORD_H * CLIFFORD_S) * new_c;
                                     return;
                                 }
                                 _ => {}
