@@ -22,6 +22,9 @@ pub struct GridSynthConfig {
     pub diophantine_data: DiophantineData,
     pub up_to_phase: bool,
     pub compute_error: bool,
+    pub stats: bool,
+    pub candidates_tried: usize,
+
 }
 
 impl GridSynthConfig {
@@ -141,5 +144,7 @@ pub fn config_from_theta_epsilon(
         diophantine_data,
         up_to_phase,
         compute_error: false,
+        stats: false,           
+        candidates_tried: 0, 
     }
 }

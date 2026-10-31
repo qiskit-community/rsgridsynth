@@ -108,6 +108,13 @@ fn build_command() -> Command {
                 .long("error")
                 .action(clap::ArgAction::SetTrue),
         )
+                .arg(
+            Arg::new("stats")
+                .long("stats")
+                .short('S')
+                .action(clap::ArgAction::SetTrue),
+        )
+
 }
 
 fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
@@ -141,6 +148,8 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         .parse()
         .unwrap();
     let verbose = matches.get_flag("verbose");
+        let stats = matches.get_flag("stats");
+
     let measure_time = matches.get_flag("time");
     let up_to_phase = matches.get_flag("phase");
     let compute_error = matches.get_flag("error");
@@ -161,5 +170,7 @@ fn parse_arguments(matches: &clap::ArgMatches) -> GridSynthConfig {
         diophantine_data,
         up_to_phase,
         compute_error,
+        stats,
+        candidates_tried: 0, 
     }
 }
