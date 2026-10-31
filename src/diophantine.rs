@@ -116,13 +116,12 @@ pub fn is_prime<R: Rng + ?Sized>(mut n: IBig, iterations: usize, rng: &mut R) ->
         }
     }
 
-    static TWO: Lazy<IBig> = Lazy::new(|| IBig::from(2));
-    static ONE: Lazy<IBig> = Lazy::new(|| IBig::ONE);
+    
 
-    if n <= *ONE {
+   if n <= IBig::ONE {
         return false;
     }
-    if n == *TWO {
+   if n == IBig::from(2) {
         return true;
     }
     if &n % 2 == 0 {
@@ -153,7 +152,7 @@ pub fn is_prime<R: Rng + ?Sized>(mut n: IBig, iterations: usize, rng: &mut R) ->
     'outer: for _ in 0..reduced_iterations {
         let a = IBig::from(random_ubig(bits, rng));
         let mut x = modpow(a, &d, &n);
-        if x == *ONE || x == n_minus1 {
+        if x == IBig::ONE || x == n_minus1 {
             continue;
         }
         for _ in 0..r - 1 {
